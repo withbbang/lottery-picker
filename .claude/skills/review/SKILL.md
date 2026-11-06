@@ -5,7 +5,7 @@ disable-model-invocation: true
 ---
 # /review
 
-`git diff HEAD` (스테이징 포함) 를 읽고 아래 순서로 점검한다. **코드를 고치지 않는다.**
+`git diff dev...HEAD` (커밋분)와 `git diff HEAD` (미커밋분)를 읽고 아래 순서로 점검한다. **코드를 고치지 않는다.**
 변경이 없으면 "변경 없음" 한 줄로 끝낸다.
 
 ## 체크리스트

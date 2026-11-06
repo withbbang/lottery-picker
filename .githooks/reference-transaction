@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""리뷰 기록이 없는 코드가 로컬 dev 브랜치에 들어오는 것을 막는다.
+
+허용하는 이동:
+- 문서 파일만 바뀌는 이동
+- 현재 dev 를 포함하고 리뷰 기록에 있는 커밋으로 이동
+- 리뷰한 커밋이나 origin/dev 의 커밋만 병합한 병합 커밋 (첫 부모가 현재 dev)
+- origin/dev 에 이미 있는 커밋으로 이동 (git pull 등)
+- 현재 dev 의 조상으로 되돌리기, dev 삭제
+
+실수를 막는 장치다. 의도적인 우회까지 막지는 못한다. (푸시 시점 검사는 pre-push)
+"""
+import sys
+
+sys.dont_write_bytecode = True
+
+from review_gate import (  # noqa: E402
+    RECORD_COMMAND,
+    REVIEW_ADVICE,
+    changes,
+    describe_size,
+    docs_only,
+    is_ancestor,
+    parents,
+    resolve,
+    reviewed_shas,
+)
+
+DEV = "refs/heads/dev"
+ORIGIN_DEV = "refs/remotes/origin/dev"
+
+
+def is_allowed(current, new, changed):
+    if docs_only(changed):
+        return True
+    has_origin = resolve(ORIGIN_DEV) is not None
+    if has_origin and is_ancestor(new, ORIGIN_DEV):
+        return True
+    reviewed = reviewed_shas()
+    if current is None:
+        return new in reviewed
+    if is_ancestor(new, current):
+        return True
+    if new in reviewed and is_ancestor(current, new):
+        return True
+    new_parents = parents(new)
+    return (
+        len(new_parents) > 1
+        and new_parents[0] == current
+        and all(p in reviewed or (has_origin and is_ancestor(p, ORIGIN_DEV)) for p in new_parents[1:])
+    )
+
+
+def main():
+    if sys.argv[1] != "prepared":
+        return 0
+    for line in sys.stdin:
+        old, new, ref = line.rstrip("\n").split(None, 2)
+        if ref != DEV or old == new or set(new) == {"0"}:
+            continue
+        current = resolve(DEV)
+        changed = changes(current, new)
+        if is_allowed(current, new, changed):
+            continue
+        print(
+            f"차단: {new[:7]} 은(는) 코드 리뷰 기록이 없어 dev 에 넣을 수 없습니다. (변경 {describe_size(changed)})\n"
+            f"{REVIEW_ADVICE}\n"
+            "지적 사항은 고치고 다시 리뷰합니다. 고치지 않을 지적은 사용자의 결정을 받습니다.\n"
+            f"통과하면 `{RECORD_COMMAND}` 로 기록합니다.\n"
+            "작업 트리 복구: 병합 커밋이 막혔으면 `git merge --abort`, "
+            "fast-forward 나 reset 이 막혔으면 `git status` 로 확인 후 `git reset --hard`.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""리뷰 기록이 없는 코드가 원격 dev·master 로 올라가는 것을 막는다.
+
+- dev: 새로 올라가는 커밋은 리뷰 기록에 포함되거나, 문서만 바꾸거나,
+  이미 검증된 커밋만 병합한 병합 커밋이어야 한다.
+- master: 원격 dev 에 있거나 함께 푸시하는 dev 에 있는 커밋만 올릴 수 있다.
+  (피처 → dev → master 순서)
+"""
+import sys
+
+sys.dont_write_bytecode = True
+
+from review_gate import (  # noqa: E402
+    RECORD_COMMAND,
+    REVIEW_ADVICE,
+    changes,
+    describe_size,
+    docs_only,
+    git,
+    is_ancestor,
+    parents,
+    resolve,
+    reviewed_shas,
+)
+
+DEV = "refs/heads/dev"
+MASTER = "refs/heads/master"
+ORIGIN_DEV = "refs/remotes/origin/dev"
+
+
+def unverified_commits(remote, new):
+    """리뷰 기록과 원격 어디에서도 닿지 않는 커밋 중 허용되지 않는 것."""
+    excluded = [f"^{sha}" for sha in reviewed_shas() if resolve(sha)]
+    if remote and resolve(remote):
+        excluded.append(f"^{remote}")
+    listed = git("rev-list", new, *excluded)
+    if listed is None:
+        return [new]  # 확인할 수 없으면 막는다.
+    pending = listed.split()
+    bad = []
+    for commit in pending:
+        commit_parents = parents(commit)
+        if not commit_parents:
+            bad.append(commit)
+        elif len(commit_parents) > 1 and not set(commit_parents[1:]) & set(pending):
+            continue
+        elif not docs_only(changes(commit_parents[0], commit)):
+            bad.append(commit)
+    return bad
+
+
+def main():
+    updates = [line.split() for line in sys.stdin]
+    pushed_dev = next((u[1] for u in updates if u[2] == DEV and set(u[1]) != {"0"}), None)
+    for _, new, remote_ref, remote in updates:
+        if set(new) == {"0"}:
+            continue
+        remote = None if set(remote) == {"0"} else remote
+        if remote_ref == MASTER:
+            dev = pushed_dev or resolve(ORIGIN_DEV)
+            if dev is None or not is_ancestor(new, dev):
+                print(
+                    f"차단: {new[:7]} 은(는) 원격 dev 에 없어 master 로 푸시할 수 없습니다. "
+                    "dev 에 병합한 뒤 `git push origin dev master` 로 함께 푸시하세요.",
+                    file=sys.stderr,
+                )
+                return 1
+        elif remote_ref == DEV:
+            bad = unverified_commits(remote, new)
+            if bad:
+                print(
+                    f"차단: 코드 리뷰 기록이 없는 커밋 {len(bad)}개를 dev 로 푸시할 수 없습니다. "
+                    f"(예: {bad[0][:7]}, 변경 {describe_size(changes(remote, new))})\n"
+                    f"{REVIEW_ADVICE}\n"
+                    f"통과하면 `{RECORD_COMMAND}` 로 기록합니다.",
+                    file=sys.stderr,
+                )
+                return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
