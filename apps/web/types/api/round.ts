@@ -28,6 +28,6 @@ export type WinningStoreResponse = {
   region: string;
   name: string;
   address: string;
-  purchaseType: string;
+  purchaseType: string | null;
   status: string;
 };

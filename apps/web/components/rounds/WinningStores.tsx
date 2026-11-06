@@ -32,7 +32,9 @@ export function WinningStores({ stores }: { stores: WinningStoreResponse[] }) {
               <li key={`${s.rank}-${s.name}-${s.address}-${i}`}>
                 <p>
                   <span className="tabular-nums">{s.rank}등</span> {s.name}
-                  <span className="opacity-70"> · {s.purchaseType}</span>
+                  {s.purchaseType ? (
+                    <span className="opacity-70"> · {s.purchaseType}</span>
+                  ) : null}
                 </p>
                 <p className="opacity-70">
                   {s.address}

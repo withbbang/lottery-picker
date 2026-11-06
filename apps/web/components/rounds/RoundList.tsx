@@ -30,6 +30,10 @@ export function RoundList() {
     return <p role="alert">회차 목록을 불러오지 못했습니다.</p>;
   }
 
+  if (data.items.length === 0) {
+    return <p>조회된 회차가 없습니다.</p>;
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <ul className="flex flex-col">
