@@ -5,9 +5,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { ApiError } from "@/lib/api";
 
-const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
+const { pathnameMock, replaceMock } = vi.hoisted(() => ({
+  pathnameMock: vi.fn(() => "/"),
+  replaceMock: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
+  usePathname: pathnameMock,
   useRouter: () => ({ replace: replaceMock }),
 }));
 
@@ -30,21 +34,10 @@ function FailingMutation() {
   );
 }
 
-function LoginAfterFailure() {
-  const failing = useMutation({ mutationFn: rejectAuthRequired });
-  const login = useMutation({ mutationFn: () => Promise.resolve() });
-  return (
-    <>
-      <button onClick={() => failing.mutate()}>변경</button>
-      <button onClick={() => login.mutate()}>로그인</button>
-      {login.isSuccess && <p>로그인됨</p>}
-    </>
-  );
-}
-
 describe("QueryProvider", () => {
   afterEach(() => {
     window.history.pushState({}, "", "/");
+    pathnameMock.mockReturnValue("/");
     replaceMock.mockReset();
   });
 
@@ -91,20 +84,24 @@ describe("QueryProvider", () => {
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
   });
 
-  it("redirects again when the session expires after a later login", async () => {
+  it("redirects again when AUTH_REQUIRED follows a navigation back from /login", async () => {
     // given
-    render(
+    const tree = () => (
       <QueryProvider>
-        <LoginAfterFailure />
-      </QueryProvider>,
+        <FailingMutation />
+      </QueryProvider>
     );
+    const { rerender } = render(tree());
     screen.getByRole("button", { name: "변경" }).click();
     await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(1));
-    screen.getByRole("button", { name: "로그인" }).click();
-    await screen.findByText("로그인됨");
+    await screen.findByRole("button", { name: "변경 실패" });
 
     // when
-    screen.getByRole("button", { name: "변경" }).click();
+    pathnameMock.mockReturnValue("/login");
+    rerender(tree());
+    pathnameMock.mockReturnValue("/");
+    rerender(tree());
+    screen.getByRole("button", { name: "변경 실패" }).click();
 
     // then
     await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(2));

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import {
   MutationCache,
@@ -20,7 +20,7 @@ function isAuthRequired(error: unknown): boolean {
   return error instanceof ApiError && error.code === "AUTH_REQUIRED";
 }
 
-function createQueryClient(moveToLogin: () => void): QueryClient {
+function createAuthAwareClient(moveToLogin: () => void) {
   let redirecting = false;
 
   const redirectIfAuthRequired = (error: unknown) => {
@@ -35,15 +35,9 @@ function createQueryClient(moveToLogin: () => void): QueryClient {
     moveToLogin();
   };
 
-  return new QueryClient({
+  const queryClient = new QueryClient({
     queryCache: new QueryCache({ onError: redirectIfAuthRequired }),
-    mutationCache: new MutationCache({
-      onError: redirectIfAuthRequired,
-      // 다시 로그인한 뒤 세션이 또 만료되면 다시 이동할 수 있게 한다.
-      onSuccess: () => {
-        redirecting = false;
-      },
-    }),
+    mutationCache: new MutationCache({ onError: redirectIfAuthRequired }),
     defaultOptions: {
       queries: {
         retry: (failureCount, error) =>
@@ -51,15 +45,38 @@ function createQueryClient(moveToLogin: () => void): QueryClient {
       },
     },
   });
+
+  return {
+    queryClient,
+    clearRedirect: () => {
+      redirecting = false;
+    },
+  };
+}
+
+function ClearRedirectOnNavigation({ onClear }: { onClear: () => void }) {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    onClear();
+  }, [pathname, onClear]);
+
+  return null;
 }
 
 export function QueryProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [queryClient] = useState(() =>
-    createQueryClient(() => router.replace(LOGIN_PATH)),
+  const [{ queryClient, clearRedirect }] = useState(() =>
+    createAuthAwareClient(() => router.replace(LOGIN_PATH)),
   );
 
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      {/* cacheComponents에서 usePathname은 동적 경로에 Suspense가 필요하다. */}
+      <Suspense fallback={null}>
+        <ClearRedirectOnNavigation onClear={clearRedirect} />
+      </Suspense>
+      {children}
+    </QueryClientProvider>
   );
 }

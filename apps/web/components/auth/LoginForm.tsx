@@ -41,9 +41,10 @@ export function LoginForm() {
           type="text"
           inputMode="numeric"
           autoComplete="one-time-code"
-          maxLength={CODE_LENGTH}
           value={code}
-          onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+          onChange={(event) =>
+            setCode(event.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))
+          }
           className="rounded-md border border-neutral-400 px-3 py-2 text-lg tracking-widest"
         />
       </label>

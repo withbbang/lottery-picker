@@ -1,6 +1,7 @@
 package com.lotterypicker.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.lotterypicker.auth.Base32;
 import com.lotterypicker.auth.TotpVerifier;
 import com.lotterypicker.auth.entity.AuthSession;
 import com.lotterypicker.auth.entity.AuthState;
@@ -27,6 +29,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -234,6 +237,29 @@ class AuthServiceTest {
 				.isInstanceOf(IllegalStateException.class)
 				.hasMessageContaining("TOTP_SECRET")
 				.hasMessageNotContaining("not-base32!");
+	}
+
+	@Test
+	void 시크릿이_16바이트보다_짧으면_값을_드러내지_않고_생성에_실패한다() {
+		// given
+		String fifteenBytes = Base32.encode(new byte[15]);
+
+		// when, then
+		for (String secret : List.of("A", "AAAAAAAA", fifteenBytes)) {
+			assertThatThrownBy(() -> serviceWith(secret))
+					.isInstanceOf(IllegalStateException.class)
+					.hasMessageContaining("TOTP_SECRET")
+					.hasMessageNotContaining(secret);
+		}
+	}
+
+	@Test
+	void 시크릿이_16바이트이면_생성에_성공한다() {
+		// given
+		String sixteenBytes = Base32.encode(new byte[16]);
+
+		// when, then
+		assertThatCode(() -> serviceWith(sixteenBytes)).doesNotThrowAnyException();
 	}
 
 	private AuthService serviceWith(String secret) {

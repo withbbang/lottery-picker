@@ -30,6 +30,7 @@ public class AuthService {
 
 	private static final Duration SESSION_LIFETIME = Duration.ofDays(30);
 	private static final int TOKEN_BYTES = 32;
+	private static final int MIN_SECRET_BYTES = 16;
 
 	private final AuthSessionRepository sessionRepository;
 	private final AuthStateRepository stateRepository;
@@ -111,10 +112,14 @@ public class AuthService {
 		if (secret == null || secret.isBlank()) {
 			throw new IllegalStateException("인증이 켜져 있으면 TOTP_SECRET이 필요합니다.");
 		}
+		byte[] decoded;
 		try {
-			Base32.decode(secret);
+			decoded = Base32.decode(secret);
 		} catch (IllegalArgumentException e) {
 			throw new IllegalStateException("TOTP_SECRET이 Base32 형식이 아닙니다.");
+		}
+		if (decoded.length < MIN_SECRET_BYTES) {
+			throw new IllegalStateException("TOTP_SECRET은 " + MIN_SECRET_BYTES + "바이트 이상이어야 합니다.");
 		}
 		return secret;
 	}

@@ -10,11 +10,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
 /** 건강 확인과 로그인 외의 모든 요청에 세션을 요구한다. 경로는 정확히 일치할 때만 공개한다. */
+@Slf4j
 public class SessionAuthFilter extends OncePerRequestFilter {
 
 	public static final String COOKIE_NAME = "LP_SESSION";
@@ -30,11 +32,24 @@ public class SessionAuthFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws ServletException, IOException {
-		if (isPublic(request) || authService.isValid(sessionToken(request))) {
+		if (isPublic(request)) {
 			chain.doFilter(request, response);
 			return;
 		}
-		writeAuthRequired(response);
+
+		boolean valid;
+		try {
+			valid = authService.isValid(sessionToken(request));
+		} catch (RuntimeException e) {
+			log.error("세션 확인 실패", e);
+			writeFailure(response, ErrorCode.COMMON_INTERNAL_ERROR);
+			return;
+		}
+		if (!valid) {
+			writeFailure(response, ErrorCode.AUTH_REQUIRED);
+			return;
+		}
+		chain.doFilter(request, response);
 	}
 
 	private static boolean isPublic(HttpServletRequest request) {
@@ -57,8 +72,7 @@ public class SessionAuthFilter extends OncePerRequestFilter {
 		return null;
 	}
 
-	private void writeAuthRequired(HttpServletResponse response) throws IOException {
-		ErrorCode code = ErrorCode.AUTH_REQUIRED;
+	private void writeFailure(HttpServletResponse response, ErrorCode code) throws IOException {
 		response.setStatus(code.getStatus().value());
 		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 		response.setCharacterEncoding(StandardCharsets.UTF_8.name());

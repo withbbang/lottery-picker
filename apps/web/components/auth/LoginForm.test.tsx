@@ -9,6 +9,7 @@ const fetchMock = vi.fn();
 const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/login",
   useRouter: () => ({ replace: replaceMock }),
 }));
 
@@ -80,6 +81,31 @@ describe("LoginForm", () => {
       "OTP 코드가 올바르지 않습니다.",
     );
     expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps six digits when a code with a space is pasted", async () => {
+    // given
+    const { input, submit } = renderForm();
+
+    // when
+    await userEvent.click(input);
+    await userEvent.paste("123 456");
+
+    // then
+    expect(input).toHaveValue("123456");
+    expect(submit).toBeEnabled();
+  });
+
+  it("drops digits past the sixth", async () => {
+    // given
+    const { input } = renderForm();
+
+    // when
+    await userEvent.click(input);
+    await userEvent.paste("1234567");
+
+    // then
+    expect(input).toHaveValue("123456");
   });
 
   it("disables submit until six digits are entered", async () => {

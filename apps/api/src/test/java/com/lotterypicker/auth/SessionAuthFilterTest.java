@@ -10,11 +10,15 @@ import jakarta.servlet.http.Cookie;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import tools.jackson.databind.json.JsonMapper;
 
+@ExtendWith(OutputCaptureExtension.class)
 class SessionAuthFilterTest {
 
 	private final AuthService authService = mock(AuthService.class);
@@ -93,6 +97,27 @@ class SessionAuthFilterTest {
 
 		// then
 		assertThat(chain.getRequest()).isNotNull();
+	}
+
+	@Test
+	void 세션_확인이_실패하면_500_래퍼를_쓰고_토큰을_로그에_남기지_않는다(CapturedOutput output)
+			throws ServletException, IOException {
+		// given
+		when(authService.isValid("good-token")).thenThrow(new IllegalStateException("db down"));
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/rounds");
+		request.setCookies(new Cookie(SessionAuthFilter.COOKIE_NAME, "good-token"));
+
+		// when
+		filter.doFilter(request, response, chain);
+
+		// then
+		assertThat(chain.getRequest()).isNull();
+		assertThat(response.getStatus()).isEqualTo(500);
+		assertThat(response.getContentType()).startsWith("application/json");
+		assertThat(response.getContentAsString(StandardCharsets.UTF_8))
+				.contains("\"success\":false")
+				.contains("\"code\":\"COMMON_INTERNAL_ERROR\"");
+		assertThat(output.getAll()).doesNotContain("good-token");
 	}
 
 	@Test
