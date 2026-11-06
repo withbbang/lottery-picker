@@ -10,6 +10,8 @@ public interface LottoRoundRepository extends JpaRepository<LottoRound, Integer>
 
 	Optional<LottoRound> findTopByOrderByRoundNoDesc();
 
+	List<LottoRound> findAllByOrderByRoundNoAsc();
+
 	@Query("select r.roundNo from LottoRound r")
 	List<Integer> findAllRoundNos();
 

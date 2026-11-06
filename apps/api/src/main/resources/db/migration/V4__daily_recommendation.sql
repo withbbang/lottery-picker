@@ -1,0 +1,23 @@
+CREATE TABLE daily_recommendation (
+    id                 BIGINT      NOT NULL AUTO_INCREMENT,
+    rec_date           DATE        NOT NULL,
+    round_no           INT         NOT NULL,
+    strategy           VARCHAR(20) NOT NULL,
+    line_index         INT         NOT NULL,
+    n1                 INT         NOT NULL,
+    n2                 INT         NOT NULL,
+    n3                 INT         NOT NULL,
+    n4                 INT         NOT NULL,
+    n5                 INT         NOT NULL,
+    n6                 INT         NOT NULL,
+    evidence           TEXT        NOT NULL,
+    relaxation         VARCHAR(30) NOT NULL,
+    fixed_snapshot     VARCHAR(200) NOT NULL,
+    excluded_snapshot  VARCHAR(200) NOT NULL,
+    history_from_round INT         NOT NULL,
+    history_to_round   INT         NOT NULL,
+    is_control         BOOLEAN     NOT NULL,
+    created_at         DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_daily_recommendation_line UNIQUE (rec_date, strategy, line_index)
+);

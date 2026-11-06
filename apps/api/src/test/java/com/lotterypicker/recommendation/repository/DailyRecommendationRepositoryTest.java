@@ -1,0 +1,154 @@
+package com.lotterypicker.recommendation.repository;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.lotterypicker.lotto.LottoNumbers;
+import com.lotterypicker.recommendation.engine.Relaxation;
+import com.lotterypicker.recommendation.engine.StrategyType;
+import com.lotterypicker.recommendation.entity.DailyRecommendation;
+import jakarta.persistence.EntityManager;
+import java.lang.reflect.Method;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
+
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class DailyRecommendationRepositoryTest {
+
+	private static final LocalDate DATE = LocalDate.of(2026, 11, 6);
+
+	@Autowired
+	private DailyRecommendationRepository repository;
+
+	@Autowired
+	private EntityManager entityManager;
+
+	private static DailyRecommendation line(StrategyType strategy, int lineIndex, List<String> evidence) {
+		return DailyRecommendation.builder()
+			.date(DATE)
+			.roundNo(1249)
+			.strategy(strategy)
+			.lineIndex(lineIndex)
+			.numbers(new LottoNumbers(List.of(45, 1, 19, 27, 38, 44)))
+			.evidence(evidence)
+			.relaxation(Relaxation.OVERLAP)
+			.fixedSnapshot("3,7")
+			.excludedSnapshot("")
+			.historyFromRound(1)
+			.historyToRound(1248)
+			.createdAt(LocalDateTime.of(2026, 11, 6, 17, 0))
+			.build();
+	}
+
+	private List<DailyRecommendation> reload() {
+		entityManager.flush();
+		entityManager.clear();
+		return repository.findByDateOrderByLineIndexAsc(DATE);
+	}
+
+	@Test
+	void 저장한_값을_그대로_읽는다() {
+		// given
+		List<String> evidence = List.of("12·34 쌍이 \"7번\" 함께 출현", "중복 제한 완화");
+		repository.saveAll(List.of(line(StrategyType.PAIR, 3, evidence)));
+
+		// when
+		DailyRecommendation stored = reload().get(0);
+
+		// then
+		assertThat(stored.getDate()).isEqualTo(DATE);
+		assertThat(stored.getRoundNo()).isEqualTo(1249);
+		assertThat(stored.getStrategy()).isEqualTo(StrategyType.PAIR);
+		assertThat(stored.getLineIndex()).isEqualTo(3);
+		assertThat(stored.numbers().values()).containsExactly(1, 19, 27, 38, 44, 45);
+		assertThat(stored.getEvidence()).isEqualTo(evidence);
+		assertThat(stored.getRelaxation()).isEqualTo(Relaxation.OVERLAP);
+		assertThat(stored.getFixedSnapshot()).isEqualTo("3,7");
+		assertThat(stored.getHistoryToRound()).isEqualTo(1248);
+		assertThat(stored.isControl()).isFalse();
+		assertThat(stored.hasSettings()).isTrue();
+	}
+
+	@Test
+	void 긴_근거도_저장한다() {
+		// given: TEXT 컬럼이라 VARCHAR(255)보다 길어도 들어간다
+		List<String> evidence = List.of("가".repeat(2_000));
+		repository.saveAll(List.of(line(StrategyType.PAIR, 0, evidence)));
+
+		// when, then
+		assertThat(reload().get(0).getEvidence()).isEqualTo(evidence);
+	}
+
+	@Test
+	void 대조군_줄은_control이다() {
+		// given
+		repository.saveAll(List.of(line(StrategyType.CONTROL, 0, List.of())));
+
+		// when
+		DailyRecommendation stored = reload().get(0);
+
+		// then
+		assertThat(stored.isControl()).isTrue();
+		assertThat(stored.getEvidence()).isEmpty();
+	}
+
+	@Test
+	void 같은_날짜_전략_줄번호는_유니크_위반이다() {
+		// given
+		repository.saveAll(List.of(line(StrategyType.PAIR, 3, List.of())));
+		entityManager.flush();
+
+		// when, then
+		assertThatThrownBy(() -> {
+			repository.saveAll(List.of(line(StrategyType.PAIR, 3, List.of())));
+			entityManager.flush();
+		}).isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
+	void 필드를_바꿔도_DB에_반영되지_않는다() {
+		// given
+		repository.saveAll(List.of(line(StrategyType.PAIR, 3, List.of())));
+		DailyRecommendation stored = reload().get(0);
+
+		// when
+		ReflectionTestUtils.setField(stored, "roundNo", 9999);
+		ReflectionTestUtils.setField(stored, "n1", 2);
+
+		// then
+		DailyRecommendation reloaded = reload().get(0);
+		assertThat(reloaded.getRoundNo()).isEqualTo(1249);
+		assertThat(reloaded.numbers().values()).contains(1).doesNotContain(2);
+	}
+
+	@Test
+	void 저장한_근거_목록은_수정할_수_없다() {
+		// given
+		repository.saveAll(List.of(line(StrategyType.PAIR, 3, List.of("근거"))));
+		DailyRecommendation stored = reload().get(0);
+
+		// when, then
+		assertThatThrownBy(() -> stored.getEvidence().add("추가")).isInstanceOf(UnsupportedOperationException.class);
+	}
+
+	@Test
+	void 리포지토리에_수정_삭제_메서드가_없다() {
+		// when
+		List<String> names = Arrays.stream(DailyRecommendationRepository.class.getMethods())
+			.map(Method::getName)
+			.toList();
+
+		// then
+		assertThat(names).containsExactlyInAnyOrder("saveAll", "existsByDate", "findByDateOrderByLineIndexAsc");
+	}
+
+}
