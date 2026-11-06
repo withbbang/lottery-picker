@@ -28,7 +28,8 @@ pnpm build
 ## 항상 지킬 것
 
 - 패키지 매니저는 **pnpm**. npm / yarn 명령 쓰지 않는다.
-- 커밋 전 바뀐 앱의 `lint`·`test` 통과. 커밋은 요청받았을 때만, Conventional Commits(`feat:` `fix:` `chore:` …) 형식.
+- 브랜치: `master`(배포용) · `dev` · 피처 브랜치. 피처 브랜치는 항상 `dev`에서 딴다. 피처 브랜치는 PR하지 않고 로컬에서 머지만 한다. origin에 푸시하는 건 `dev`, `master`만.
+- 커밋 전 바뀐 앱의 `lint`·`test` 통과. 커밋은 요청받았을 때만, 메시지는 **커밋 전에 `.gitmessage.txt`를 읽고** 그 정책대로 쓴다. 형식 `Type(scope) : 제목`, 타입 첫 글자 대문자 (예: `Feat : 로또 번호 추첨 추가`). `-m`/`-F`는 템플릿을 거치지 않으니 직접 맞춘다. 위반 시 `.githooks/commit-msg`가 거부한다 (클론 후 1회: `git config --local commit.template ./.gitmessage.txt && git config --local core.hooksPath .githooks`).
 - **추첨 로직은 `apps/api` 한 곳에만.** 프론트는 호출·표시만 한다. (세부: `.claude/rules/lotto-domain.md`)
 - `.env*` 파일은 읽지도 고치지도 않는다. 예시는 `.env.example`에만 쓴다. (훅으로 차단됨)
 - API 응답 포맷·에러 코드는 `api-conventions` 스킬을 따른다. 임의로 새 포맷 만들지 않는다.

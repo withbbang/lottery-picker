@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""커밋 메시지가 .gitmessage.txt 정책을 지키는지 검사한다."""
+import re
+import sys
+
+TYPES = "Feat|Fix|Refactor|Style|Docs|Test|Chore|Merge|Ops"
+SUBJECT = re.compile(rf"^({TYPES})(\([^()\s]+\))? : \S.*$")
+SUBJECT_MAX = 50
+BODY_MAX = 72
+
+
+def check(message):
+    # 에디터로 작성하면 템플릿 주석이 포함된 채로 넘어온다.
+    lines = [l.rstrip() for l in message.splitlines() if not l.startswith("#")]
+    while lines and not lines[0]:
+        lines.pop(0)
+    if not lines:
+        return []  # 빈 메시지는 git이 알아서 중단한다.
+
+    subject, rest = lines[0], lines[1:]
+    errors = []
+    if not SUBJECT.match(subject):
+        errors.append(f"제목 형식은 'Type(scope) : 제목' 입니다. 타입: {TYPES.replace('|', ', ')}")
+    if len(subject) > SUBJECT_MAX:
+        errors.append(f"제목은 {SUBJECT_MAX}자 이내입니다. (현재 {len(subject)}자)")
+    if subject.endswith("."):
+        errors.append("제목 끝에 마침표를 쓰지 않습니다.")
+    if rest and rest[0]:
+        errors.append("제목과 본문 사이는 한 줄 띄웁니다.")
+    for line in rest:
+        if len(line) > BODY_MAX:
+            errors.append(f"본문은 한 줄 {BODY_MAX}자 이내입니다: {line}")
+    return errors
+
+
+def main():
+    with open(sys.argv[1], encoding="utf-8") as f:
+        errors = check(f.read())
+    if errors:
+        print("커밋 거부: .gitmessage.txt 정책 위반", file=sys.stderr)
+        for error in errors:
+            print(f"  - {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
