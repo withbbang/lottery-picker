@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -238,7 +237,7 @@ class AuthServiceTest {
 	}
 
 	private AuthService serviceWith(String secret) {
-		return new AuthService(sessionRepository, stateRepository, clock, new Random(1), secret);
+		return new AuthService(sessionRepository, stateRepository, clock, secret);
 	}
 
 	private void lockOut() {

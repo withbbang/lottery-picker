@@ -11,13 +11,13 @@ import com.lotterypicker.common.ErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
-import java.util.Random;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -34,15 +34,15 @@ public class AuthService {
 	private final AuthSessionRepository sessionRepository;
 	private final AuthStateRepository stateRepository;
 	private final Clock clock;
-	private final Random random;
+	// 유일한 인증 수단이므로 재현용 Random 빈과 분리해 항상 CSPRNG를 쓴다.
+	private final SecureRandom secureRandom = new SecureRandom();
 	private final String secret;
 
 	public AuthService(AuthSessionRepository sessionRepository, AuthStateRepository stateRepository, Clock clock,
-			Random random, @Value("${app.auth.totp-secret}") String secret) {
+			@Value("${app.auth.totp-secret}") String secret) {
 		this.sessionRepository = sessionRepository;
 		this.stateRepository = stateRepository;
 		this.clock = clock;
-		this.random = random;
 		this.secret = requireValidSecret(secret);
 	}
 
@@ -103,7 +103,7 @@ public class AuthService {
 
 	private String newToken() {
 		byte[] bytes = new byte[TOKEN_BYTES];
-		random.nextBytes(bytes);
+		secureRandom.nextBytes(bytes);
 		return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
 	}
 
