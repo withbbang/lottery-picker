@@ -84,17 +84,45 @@ public class DhLotteryClient {
 			if (rank < 1 || rank > TIER_COUNT) {
 				throw new CollectorException("판매점 등수가 올바르지 않습니다: " + rank);
 			}
+			String formerAddress = optionalTextOf(node, "befAddr");
 			result.add(new StorePayload(
 				rank,
-				textOf(node, "region"),
+				storeRegion(node, formerAddress),
 				textOf(node, "shpNm"),
-				textOf(node, "shpAddr"),
+				storeAddress(node, formerAddress),
 				optionalTextOf(node, "atmtPsvYnTxt"),
 				optionalDoubleOf(node, "shpLat"),
 				optionalDoubleOf(node, "shpLot"),
 				optionalTextOf(node, "status")));
 		}
 		return result;
+	}
+
+	/**
+	 * 폐점한 오래된 판매점은 region 이 공백이다. 이때만 당첨 당시 주소(befAddr)의 첫 단어로 대신한다.
+	 * 대신할 값도 없으면 형식 오류로 본다.
+	 */
+	private static String storeRegion(JsonNode node, String formerAddress) {
+		JsonNode value = node.path("region");
+		if (value.isString() && !value.stringValue().isBlank()) {
+			return value.stringValue().trim();
+		}
+		if (formerAddress != null && !formerAddress.isBlank()) {
+			return formerAddress.trim().split("\\s+")[0];
+		}
+		throw new CollectorException("문자열 필드가 없거나 비어 있습니다: region");
+	}
+
+	/** 폐점한 오래된 판매점은 shpAddr 가 공백이다. 이때만 당첨 당시 주소(befAddr)로 대신한다. */
+	private static String storeAddress(JsonNode node, String formerAddress) {
+		JsonNode value = node.path("shpAddr");
+		if (value.isString() && !value.stringValue().isBlank()) {
+			return value.stringValue().trim();
+		}
+		if (formerAddress != null && !formerAddress.isBlank()) {
+			return formerAddress.trim();
+		}
+		throw new CollectorException("문자열 필드가 없거나 비어 있습니다: shpAddr");
 	}
 
 	private RoundPayload toRoundPayload(JsonNode node) {

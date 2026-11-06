@@ -175,6 +175,49 @@ class DhLotteryClientTest {
 		assertThatThrownBy(() -> client.fetchRoundPage(1248)).isInstanceOf(CollectorException.class);
 	}
 
+	private static String closedStoreJson(String address, String region, String beforeAddress) {
+		return "{\"data\":{\"list\":[{\"wnShpRnk\":2,\"shpNm\":\"노다지\",\"status\":\"폐점\","
+			+ "\"shpAddr\":\"" + address + "\",\"region\":\"" + region + "\","
+			+ "\"befAddr\":" + (beforeAddress == null ? "null" : "\"" + beforeAddress + "\"") + ","
+			+ "\"atmtPsvYnTxt\":null,\"shpLat\":37.589488,\"shpLot\":127.091767}]}}";
+	}
+
+	@Test
+	void 폐점한_판매점은_당첨_당시_주소로_지역과_주소를_채운다() {
+		// given
+		respondJson(STORE_URL, closedStoreJson("   ", " ", "서울 중랑구 면목동  74-35"));
+
+		// when
+		List<StorePayload> stores = client.fetchStores(1248);
+
+		// then
+		assertThat(stores).hasSize(1);
+		assertThat(stores.get(0).region()).isEqualTo("서울");
+		assertThat(stores.get(0).address()).isEqualTo("서울 중랑구 면목동  74-35");
+	}
+
+	@Test
+	void 주소가_일부만_있으면_주소는_그대로_두고_지역만_채운다() {
+		// given
+		respondJson(STORE_URL, closedStoreJson("    앞도로가로판매", " ", "서울 성동구 성수동2가  235-1호 앞도로가로판매"));
+
+		// when
+		List<StorePayload> stores = client.fetchStores(1248);
+
+		// then
+		assertThat(stores.get(0).region()).isEqualTo("서울");
+		assertThat(stores.get(0).address()).isEqualTo("앞도로가로판매");
+	}
+
+	@Test
+	void 대체할_당시_주소도_없으면_CollectorException이다() {
+		// given
+		respondJson(STORE_URL, closedStoreJson("   ", " ", null));
+
+		// when & then
+		assertThatThrownBy(() -> client.fetchStores(1248)).isInstanceOf(CollectorException.class);
+	}
+
 	@Test
 	void 서버_오류_응답은_CollectorException이다() {
 		// given
