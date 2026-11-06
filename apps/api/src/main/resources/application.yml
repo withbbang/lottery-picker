@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: lottery-picker-api
+  profiles:
+    default: local
+  jpa:
+    open-in-view: false
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}

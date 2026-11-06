@@ -30,6 +30,7 @@ description: apps/api 와 apps/web 이 공유하는 REST 규약 — URL 설계, 
 |---|---|---|
 | `COMMON_VALIDATION_FAILED` | 400 | 요청 필드 검증 실패 |
 | `COMMON_NOT_FOUND` | 404 | 리소스 없음 |
+| `COMMON_INTERNAL_ERROR` | 500 | 처리되지 않은 서버 오류 |
 | `DRAW_NUMBER_OUT_OF_RANGE` | 400 | 1~45 밖 숫자 |
 | `DRAW_FIXED_EXCLUDED_OVERLAP` | 400 | 고정·제외 번호 겹침 |
 | `DRAW_NOT_ENOUGH_CANDIDATES` | 400 | 후보 6개 미만 |
