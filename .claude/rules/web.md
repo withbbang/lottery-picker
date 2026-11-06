@@ -5,7 +5,7 @@ paths:
 # apps/web — Next.js 16 / React 19 / TypeScript
 
 - **App Router**. 서버 컴포넌트가 기본, 상호작용(이벤트·훅)이 필요한 파일에만 `"use client"`.
-- 데이터: 서버 컴포넌트는 `fetch` 직접, 클라이언트는 React Query. API 베이스 URL은 `NEXT_PUBLIC_API_URL` 하나로만.
+- 데이터는 클라이언트 React Query로 조회. 호출은 같은 주소의 `/api/*` 상대 경로만. 서버 컴포넌트는 데이터 API를 호출하지 않는다.
 - API 호출은 `lib/api.ts`의 래퍼를 통해서만. 컴포넌트에서 `fetch` 직접 호출 금지.
 - 상태: 서버 상태는 React Query. 전역 UI 상태가 정말 필요할 때만 Redux Toolkit 도입, 그 전엔 로컬 state.
 - 디렉토리: `app/`(라우트) · `components/ui/`(범용) · `components/<feature>/`(도메인) · `hooks/` · `lib/` · `types/api/`.

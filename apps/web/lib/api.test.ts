@@ -10,17 +10,15 @@ function jsonResponse(body: unknown, status = 200) {
 
 describe("apiFetch", () => {
   beforeEach(() => {
-    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://api.test");
     vi.stubGlobal("fetch", fetchMock);
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     fetchMock.mockReset();
   });
 
-  it("calls the base URL and returns unwrapped data on success", async () => {
+  it("calls the relative path and returns unwrapped data on success", async () => {
     // given
     fetchMock.mockResolvedValue(
       jsonResponse({ success: true, data: { status: "UP" } }),
@@ -31,7 +29,7 @@ describe("apiFetch", () => {
 
     // then
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://api.test/api/v1/health",
+      "/api/v1/health",
       undefined,
     );
     expect(data).toEqual({ status: "UP" });
@@ -68,17 +66,5 @@ describe("apiFetch", () => {
 
     // then
     expect(data).toBeUndefined();
-  });
-
-  it("throws when the API base URL is not configured", async () => {
-    // given
-    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
-
-    // when
-    const result = apiFetch("/api/v1/health");
-
-    // then
-    await expect(result).rejects.toThrow("NEXT_PUBLIC_API_URL");
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

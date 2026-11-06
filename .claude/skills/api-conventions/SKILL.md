@@ -19,7 +19,7 @@ description: apps/api 와 apps/web 이 공유하는 REST 규약 — URL 설계, 
 { "success": false, "error": { "code": "DRAW_NOT_ENOUGH_CANDIDATES", "message": "제외 번호를 뺀 후보가 6개 미만입니다." } }
 ```
 - `data` 는 객체 또는 배열. `null` 응답은 204 로.
-- HTTP 상태: 200 조회/수정 · 201 생성 · 204 삭제 · 400 검증 실패 · 404 없음 · 409 충돌 · 500 서버 오류.
+- HTTP 상태: 200 조회/수정 · 201 생성 · 204 삭제 · 400 검증 실패 · 401 인증 필요 · 404 없음 · 409 충돌 · 429 시도 제한 · 500 서버 오류.
 
 ## 에러 코드
 - 형식 `<DOMAIN>_<REASON>` 대문자 스네이크. `ErrorCode` enum 한 곳에서 관리 (`apps/api/.../common/ErrorCode.java`).
@@ -34,6 +34,9 @@ description: apps/api 와 apps/web 이 공유하는 REST 규약 — URL 설계, 
 | `DRAW_NUMBER_OUT_OF_RANGE` | 400 | 1~45 밖 숫자 |
 | `DRAW_FIXED_EXCLUDED_OVERLAP` | 400 | 고정·제외 번호 겹침 |
 | `DRAW_NOT_ENOUGH_CANDIDATES` | 400 | 후보 6개 미만 |
+| `AUTH_REQUIRED` | 401 | 세션 없음 또는 만료 |
+| `AUTH_INVALID_CODE` | 400 | OTP 코드 틀림 또는 재사용 |
+| `AUTH_LOCKED` | 429 | 연속 5회 실패로 15분 잠금 |
 
 ## 페이징
 - 요청 `?page=0&size=20` (0-based, size 최대 100).
@@ -45,5 +48,8 @@ description: apps/api 와 apps/web 이 공유하는 REST 규약 — URL 설계, 
 - DTO 클래스: `DrawCreateRequest` / `DrawResponse`. 웹 타입도 같은 이름으로 `types/api/draw.ts`.
 
 ## 웹 쪽 구현
-- `lib/api.ts` 의 `apiFetch<T>()` 하나로 호출. `success: false` 면 `ApiError(code, message)` 를 throw.
+- `lib/api.ts` 의 `apiFetch<T>()` 하나로 호출. 경로는 같은 주소의 `/api/*` 상대 경로만 쓰고, 쿠키는 브라우저가 자동으로 보낸다. `success: false` 면 `ApiError(code, message)` 를 throw.
+- Next.js rewrites 가 `/api/*` 를 `API_INTERNAL_URL` 로 전달한다. 값은 `next build` 시점에 필요하다.
+- 데이터 조회는 클라이언트 React Query로 한다. 서버 컴포넌트는 데이터 API를 호출하지 않는다.
+- `AUTH_REQUIRED` 는 `QueryProvider` 가 한 곳에서 받아 `/login` 으로 이동시킨다.
 - React Query 키: `['draws']`, `['draws', id]`. 변이 후 `['draws']` invalidate.
