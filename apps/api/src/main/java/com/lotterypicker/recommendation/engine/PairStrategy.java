@@ -57,7 +57,7 @@ public class PairStrategy implements LineStrategy {
 	private record PairFact(int number, int partner, int count, int weight) {
 
 		String text() {
-			return Math.min(number, partner) + "·" + Math.max(number, partner) + " 쌍이 " + count + "번 함께 출현";
+			return Math.min(number, partner) + "·" + Math.max(number, partner) + " 쌍이 " + count + "회 함께 출현";
 		}
 
 	}

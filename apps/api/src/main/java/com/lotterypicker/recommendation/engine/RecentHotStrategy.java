@@ -16,7 +16,7 @@ public class RecentHotStrategy implements LineStrategy {
 		WeightedSampler.Sample sample = WeightedSampler.sample(c,
 				(number, chosen) -> stats.recentFrequency(number, WINDOW) + 1, random);
 		return new DrawnLine(type(), sample.numbers(),
-				sample.evidence(count -> "최근 " + WINDOW + "회 중 " + count + "번 출현"));
+				sample.evidence(count -> "최근 " + WINDOW + "회 중 " + count + "회 출현"));
 	}
 
 }

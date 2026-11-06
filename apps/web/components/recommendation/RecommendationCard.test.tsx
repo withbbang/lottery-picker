@@ -19,31 +19,31 @@ const set: RecommendationSetResponse = {
     {
       strategy: "RECENT_HOT",
       numbers: [1, 8, 15, 22, 33, 45],
-      evidence: ["최근 50회 중 11번 출현", "중복 제한 완화"],
+      evidence: ["번호 8: 최근 50회 중 11회 출현", "중복 제한 완화"],
       relaxation: "OVERLAP",
     },
     {
       strategy: "LONG_COLD",
       numbers: [2, 9, 16, 23, 34, 44],
-      evidence: ["23회째 미출현"],
+      evidence: ["번호 9: 23회째 미출현"],
       relaxation: "NONE",
     },
     {
       strategy: "ALL_TIME",
       numbers: [3, 10, 17, 24, 35, 43],
-      evidence: ["전체 1248회 중 190번 출현"],
+      evidence: ["번호 3: 전체 1248회 중 190회 출현"],
       relaxation: "NONE",
     },
     {
       strategy: "PAIR",
       numbers: [4, 11, 18, 25, 36, 42],
-      evidence: ["12·34 쌍이 9번 함께 출현"],
+      evidence: ["12·34 쌍이 9회 함께 출현"],
       relaxation: "NONE",
     },
     {
       strategy: "BALANCED",
       numbers: [5, 12, 19, 26, 37, 41],
-      evidence: ["홀3:짝3, 합계 138, 과거 분포 중앙 구간"],
+      evidence: ["홀3:짝3, 합계 137, 과거 분포 중앙 구간"],
       relaxation: "NONE",
     },
   ],
@@ -89,7 +89,9 @@ describe("RecommendationCard", () => {
 
     const first = within(lines[0]);
     expect(first.getByText("최근 빈도")).toBeInTheDocument();
-    expect(first.getByText("최근 50회 중 11번 출현")).toBeInTheDocument();
+    expect(
+      first.getByText("번호 8: 최근 50회 중 11회 출현"),
+    ).toBeInTheDocument();
     expect(first.getByText("중복 제한 완화")).toBeInTheDocument();
     expect(first.getByText("45")).toBeInTheDocument();
     expect(within(lines[3]).getByText("번호 쌍")).toBeInTheDocument();
@@ -99,7 +101,7 @@ describe("RecommendationCard", () => {
   });
 
   it("shows identical evidence lines without a key warning", async () => {
-    // given: 근거 문구에는 번호가 없어 같은 문구가 반복될 수 있다
+    // given: 저장된 근거는 받은 그대로 표시하므로 같은 문구가 반복될 수 있다
     const consoleError = vi.spyOn(console, "error");
     const repeated = {
       ...set,

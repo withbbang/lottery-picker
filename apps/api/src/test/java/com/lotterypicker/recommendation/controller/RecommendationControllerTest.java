@@ -89,7 +89,7 @@ class RecommendationControllerTest {
 			.strategy(strategy)
 			.lineIndex(lineIndex)
 			.numbers(new LottoNumbers(List.of(3, 11, 19, 27, 38, 44)))
-			.evidence(List.of("최근 50회 중 11번 출현"))
+			.evidence(List.of("번호 3: 최근 50회 중 11회 출현"))
 			.relaxation(Relaxation.NONE)
 			.fixedSnapshot("")
 			.excludedSnapshot("")
@@ -128,7 +128,7 @@ class RecommendationControllerTest {
 			.andExpect(jsonPath("$.data.lines[*].strategy", not(hasItem("CONTROL"))))
 			.andExpect(jsonPath("$.data.lines[0].strategy").value("RECENT_HOT"))
 			.andExpect(jsonPath("$.data.lines[0].numbers", hasSize(6)))
-			.andExpect(jsonPath("$.data.lines[0].evidence[0]").value("최근 50회 중 11번 출현"))
+			.andExpect(jsonPath("$.data.lines[0].evidence[0]").value("번호 3: 최근 50회 중 11회 출현"))
 			.andExpect(jsonPath("$.data.lines[0].relaxation").value("NONE"));
 	}
 

@@ -248,10 +248,10 @@ class RecommendationEngineTest {
 
 		// then
 		assertThat(set.lines().get(0).relaxation()).isEqualTo(Relaxation.NONE);
-		assertThat(set.lines().get(0).line().evidence()).contains("최근 50회 중 11번 출현");
-		assertThat(set.lines().get(1).line().evidence()).contains("23회째 미출현");
-		assertThat(set.lines().get(2).line().evidence()).contains("전체 1248회 중 190번 출현");
-		assertThat(set.lines().get(3).line().evidence()).contains("12·34 쌍이 8번 함께 출현");
+		assertThat(set.lines().get(0).line().evidence()).contains("번호 3: 최근 50회 중 11회 출현");
+		assertThat(set.lines().get(1).line().evidence()).contains("번호 39: 23회째 미출현");
+		assertThat(set.lines().get(2).line().evidence()).contains("번호 3: 전체 1248회 중 190회 출현");
+		assertThat(set.lines().get(3).line().evidence()).contains("12·34 쌍이 8회 함께 출현");
 		assertThat(set.lines().get(4).line().evidence()).contains("홀3:짝3, 합계 137, 과거 분포 중앙 구간");
 	}
 
@@ -274,7 +274,26 @@ class RecommendationEngineTest {
 
 		// then
 		int highest = line.numbers().values().stream().mapToInt(stats::frequency).max().orElseThrow();
-		assertThat(line.evidence().get(0)).isEqualTo("전체 300회 중 " + highest + "번 출현");
+		List<String> expected = line.numbers().values().stream()
+			.filter(number -> stats.frequency(number) == highest)
+			.map(number -> "번호 " + number + ": 전체 300회 중 " + highest + "회 출현")
+			.toList();
+		assertThat(line.evidence().get(0)).isIn(expected);
+	}
+
+	@Test
+	void 수치가_같은_번호도_근거를_각각_남긴다() {
+		// given: 후보 6개가 모두 1회씩 나온 데이터
+		DrawHistory history = new DrawHistory(List.of(draw(1, 1, 2, 3, 4, 5, 6)));
+		RecommendationConstraint constraint = RecommendationConstraint.of(Set.of(), allExcept(1, 2, 3, 4, 5, 6));
+
+		// when
+		DrawnLine line = new AllTimeStrategy().draw(NumberStatistics.from(history), constraint, new Random(20));
+
+		// then
+		assertThat(line.evidence()).hasSize(2);
+		assertThat(line.evidence()).doesNotHaveDuplicates();
+		assertThat(line.evidence()).allMatch(text -> text.matches("번호 [1-6]: 전체 1회 중 1회 출현"));
 	}
 
 	@Test
@@ -326,7 +345,7 @@ class RecommendationEngineTest {
 
 	/**
 	 * 평소 회차 {1,2,5,40,44,45}는 홀3, 저번호3, 합계 137이고 전체의 84%라 세 범위가 이 값으로 고정된다.
-	 * 3: 전체 190번, 최근 50회 11번. 12·34: 함께 8번. 39: 23회째 미출현이 후보 중 가장 길다.
+	 * 3: 전체 190회, 최근 50회 중 11회. 12·34: 함께 8회. 39: 23회째 미출현이 후보 중 가장 길다.
 	 */
 	private static DrawHistory evidenceHistory() {
 		List<HistoricalDraw> draws = new ArrayList<>();

@@ -28,15 +28,13 @@ final class WeightedSampler {
 	/** {@code picks}는 추출 순서대로이며 고정 번호를 뺀다. */
 	record Sample(LottoNumbers numbers, List<Pick> picks) {
 
-		/** 가중치가 높았던 번호 최대 2개의 근거. 가중치가 전부 기본값 1이면 수치가 0이라 쓰지 않는다. */
+		/** 가중치가 높았던 번호 최대 2개의 근거. 가중치가 기본값 1인 번호는 수치가 0이라 쓰지 않는다. */
 		List<String> evidence(IntFunction<String> text) {
 			return picks.stream()
 				.sorted(Comparator.comparingInt(Pick::weight).reversed())
 				.limit(MAX_EVIDENCE)
-				.map(pick -> pick.weight() - 1)
-				.filter(value -> value > 0)
-				.map(text::apply)
-				.distinct()
+				.filter(pick -> pick.weight() > 1)
+				.map(pick -> "번호 " + pick.number() + ": " + text.apply(pick.weight() - 1))
 				.toList();
 		}
 
