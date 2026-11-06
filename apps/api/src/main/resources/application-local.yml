@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:lottery;MODE=MySQL;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:file:./.data/lottery;MODE=MySQL
     username: sa
     password:
   h2:
@@ -8,4 +8,4 @@ spring:
       enabled: true
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate

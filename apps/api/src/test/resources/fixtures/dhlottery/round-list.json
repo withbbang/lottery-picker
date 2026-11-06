@@ -1,0 +1,43 @@
+{
+ "resultCode": null,
+ "resultMessage": null,
+ "data": {
+  "list": [
+   {
+    "rnum": 1,
+    "ltEpsd": 1248,
+    "ltRflYmd": "20261031",
+    "ltEpsdBgngYmd": "20261025",
+    "ltEpsdEndYmd": "20261031"
+   },
+   {
+    "rnum": 2,
+    "ltEpsd": 1247,
+    "ltRflYmd": "20261024",
+    "ltEpsdBgngYmd": "20261018",
+    "ltEpsdEndYmd": "20261024"
+   },
+   {
+    "rnum": 3,
+    "ltEpsd": 1246,
+    "ltRflYmd": "20261017",
+    "ltEpsdBgngYmd": "20261011",
+    "ltEpsdEndYmd": "20261017"
+   },
+   {
+    "rnum": 4,
+    "ltEpsd": 1245,
+    "ltRflYmd": "20261010",
+    "ltEpsdBgngYmd": "20261004",
+    "ltEpsdEndYmd": "20261010"
+   },
+   {
+    "rnum": 5,
+    "ltEpsd": 1244,
+    "ltRflYmd": "20261003",
+    "ltEpsdBgngYmd": "20260927",
+    "ltEpsdEndYmd": "20261003"
+   }
+  ]
+ }
+}
