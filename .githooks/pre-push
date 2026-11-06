@@ -72,7 +72,8 @@ def main():
                     f"차단: 코드 리뷰 기록이 없는 커밋 {len(bad)}개를 dev 로 푸시할 수 없습니다. "
                     f"(예: {bad[0][:7]}, 변경 {describe_size(changes(remote, new))})\n"
                     f"{REVIEW_ADVICE}\n"
-                    f"통과하면 `{RECORD_COMMAND}` 로 기록합니다.",
+                    "실제 동작 버그만 고치고 테스트로 확인합니다. 나머지 지적은 결과만 보고합니다.\n"
+                    f"버그가 없거나 고쳤으면 `{RECORD_COMMAND}` 로 기록합니다.",
                     file=sys.stderr,
                 )
                 return 1

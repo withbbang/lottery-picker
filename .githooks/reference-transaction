@@ -65,8 +65,8 @@ def main():
         print(
             f"차단: {new[:7]} 은(는) 코드 리뷰 기록이 없어 dev 에 넣을 수 없습니다. (변경 {describe_size(changed)})\n"
             f"{REVIEW_ADVICE}\n"
-            "지적 사항은 고치고 다시 리뷰합니다. 고치지 않을 지적은 사용자의 결정을 받습니다.\n"
-            f"통과하면 `{RECORD_COMMAND}` 로 기록합니다.\n"
+            "실제 동작 버그만 고치고 테스트로 확인합니다. 나머지 지적은 결과만 보고합니다.\n"
+            f"버그가 없거나 고쳤으면 `{RECORD_COMMAND}` 로 기록합니다.\n"
             "작업 트리 복구: 병합 커밋이 막혔으면 `git merge --abort`, "
             "fast-forward 나 reset 이 막혔으면 `git status` 로 확인 후 `git reset --hard`.",
             file=sys.stderr,
