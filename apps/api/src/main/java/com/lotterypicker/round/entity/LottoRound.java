@@ -98,6 +98,10 @@ public class LottoRound {
 		this.storeFetchedAt = storeFetchedAt;
 	}
 
+	public void markStoresFetched(LocalDateTime at) {
+		this.storeFetchedAt = at;
+	}
+
 	public LottoNumbers numbers() {
 		return new LottoNumbers(List.of(n1, n2, n3, n4, n5, n6));
 	}
