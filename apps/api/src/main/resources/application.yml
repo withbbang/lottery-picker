@@ -7,8 +7,10 @@ spring:
     open-in-view: false
 
 app:
-  cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  auth:
+    enabled: true
+    totp-secret: ${TOTP_SECRET:}
+    cookie-secure: true
   dhlottery:
     base-url: https://www.dhlottery.co.kr
     min-interval-ms: 2000

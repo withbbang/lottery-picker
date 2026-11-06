@@ -9,3 +9,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+app:
+  auth:
+    enabled: false
+    cookie-secure: false

@@ -43,3 +43,10 @@ tasks.named('test') {
 	systemProperty 'app.scheduling.enabled', 'false'
 	systemProperty 'spring.datasource.url', 'jdbc:h2:mem:test;MODE=MySQL;DB_CLOSE_DELAY=-1'
 }
+
+tasks.register('totpSetup', JavaExec) {
+	group = 'application'
+	description = 'TOTP 시크릿과 등록용 otpauth URI를 출력한다.'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.lotterypicker.auth.TotpSetup'
+}
