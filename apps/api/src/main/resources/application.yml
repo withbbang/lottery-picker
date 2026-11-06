@@ -11,6 +11,6 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
   dhlottery:
     base-url: https://www.dhlottery.co.kr
-    min-interval-ms: 500
+    min-interval-ms: 2000
   scheduling:
     enabled: ${SCHEDULING_ENABLED:true}

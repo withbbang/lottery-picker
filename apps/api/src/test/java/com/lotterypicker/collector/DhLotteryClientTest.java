@@ -197,7 +197,7 @@ class DhLotteryClientTest {
 	}
 
 	@Test
-	void 주소가_일부만_있으면_주소는_그대로_두고_지역만_채운다() {
+	void 폐점_판매점의_주소가_상세_문구뿐이면_당시_주소를_쓴다() {
 		// given
 		respondJson(STORE_URL, closedStoreJson("    앞도로가로판매", " ", "서울 성동구 성수동2가  235-1호 앞도로가로판매"));
 
@@ -206,6 +206,55 @@ class DhLotteryClientTest {
 
 		// then
 		assertThat(stores.get(0).region()).isEqualTo("서울");
+		assertThat(stores.get(0).address()).isEqualTo("서울 성동구 성수동2가  235-1호 앞도로가로판매");
+	}
+
+	@Test
+	void 폐점_판매점의_주소가_공백_있는_상세_문구여도_당시_주소를_쓴다() {
+		// given
+		respondJson(STORE_URL, closedStoreJson("1층 세븐일레븐", " ", "서울 강남구 역삼동 1-1"));
+
+		// when
+		List<StorePayload> stores = client.fetchStores(1248);
+
+		// then
+		assertThat(stores.get(0).address()).isEqualTo("서울 강남구 역삼동 1-1");
+	}
+
+	@Test
+	void 폐점_판매점의_주소가_지역으로_시작하면_그대로_둔다() {
+		// given
+		respondJson(STORE_URL, closedStoreJson("서울 성동구 성수동2가 235-1", " ", "서울 성동구 성수동2가  235-1호 앞도로가로판매"));
+
+		// when
+		List<StorePayload> stores = client.fetchStores(1248);
+
+		// then
+		assertThat(stores.get(0).address()).isEqualTo("서울 성동구 성수동2가 235-1");
+	}
+
+	@Test
+	void 지역이_있는_정상_판매점의_공백_없는_주소는_그대로_둔다() {
+		// given
+		respondJson(STORE_URL, closedStoreJson("동행복권(dhlottery.co.kr)", "서울", "서울 중구 어딘가 1"));
+
+		// when
+		List<StorePayload> stores = client.fetchStores(1248);
+
+		// then
+		assertThat(stores.get(0).region()).isEqualTo("서울");
+		assertThat(stores.get(0).address()).isEqualTo("동행복권(dhlottery.co.kr)");
+	}
+
+	@Test
+	void 당시_주소가_없으면_상세_문구를_그대로_둔다() {
+		// given
+		respondJson(STORE_URL, closedStoreJson("앞도로가로판매", "서울", null));
+
+		// when
+		List<StorePayload> stores = client.fetchStores(1248);
+
+		// then
 		assertThat(stores.get(0).address()).isEqualTo("앞도로가로판매");
 	}
 

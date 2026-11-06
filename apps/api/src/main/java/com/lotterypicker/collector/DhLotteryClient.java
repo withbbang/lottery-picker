@@ -89,7 +89,7 @@ public class DhLotteryClient {
 				rank,
 				storeRegion(node, formerAddress),
 				textOf(node, "shpNm"),
-				storeAddress(node, formerAddress),
+				storeAddress(node, formerAddress, regionBlank(node)),
 				optionalTextOf(node, "atmtPsvYnTxt"),
 				optionalDoubleOf(node, "shpLat"),
 				optionalDoubleOf(node, "shpLot"),
@@ -108,21 +108,39 @@ public class DhLotteryClient {
 			return value.stringValue().trim();
 		}
 		if (formerAddress != null && !formerAddress.isBlank()) {
-			return formerAddress.trim().split("\\s+")[0];
+			return firstWord(formerAddress);
 		}
 		throw new CollectorException("문자열 필드가 없거나 비어 있습니다: region");
 	}
 
-	/** 폐점한 오래된 판매점은 shpAddr 가 공백이다. 이때만 당첨 당시 주소(befAddr)로 대신한다. */
-	private static String storeAddress(JsonNode node, String formerAddress) {
+	private static boolean regionBlank(JsonNode node) {
+		JsonNode value = node.path("region");
+		return !value.isString() || value.stringValue().isBlank();
+	}
+
+	/**
+	 * 폐점한 오래된 판매점(region 공백)은 shpAddr 가 비었거나 "1층" 같은 상세 문구뿐일 수 있다.
+	 * 이때 shpAddr 의 첫 단어가 당시 주소(befAddr)의 첫 단어와 다르면 befAddr 로 대신한다.
+	 * region 이 있는 레코드는 그대로 둔다. befAddr 가 없으면 shpAddr 를 유지하고, 둘 다 비면 형식 오류다.
+	 */
+	private static String storeAddress(JsonNode node, String formerAddress, boolean regionBlank) {
 		JsonNode value = node.path("shpAddr");
-		if (value.isString() && !value.stringValue().isBlank()) {
-			return value.stringValue().trim();
+		String address = value.isString() ? value.stringValue().trim() : "";
+		boolean hasFormer = formerAddress != null && !formerAddress.isBlank();
+		if (address.isEmpty()) {
+			if (hasFormer) {
+				return formerAddress.trim();
+			}
+			throw new CollectorException("문자열 필드가 없거나 비어 있습니다: shpAddr");
 		}
-		if (formerAddress != null && !formerAddress.isBlank()) {
+		if (regionBlank && hasFormer && !firstWord(address).equals(firstWord(formerAddress))) {
 			return formerAddress.trim();
 		}
-		throw new CollectorException("문자열 필드가 없거나 비어 있습니다: shpAddr");
+		return address;
+	}
+
+	private static String firstWord(String text) {
+		return text.trim().split("\\s+")[0];
 	}
 
 	private RoundPayload toRoundPayload(JsonNode node) {
