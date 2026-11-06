@@ -34,6 +34,8 @@ description: apps/api 와 apps/web 이 공유하는 REST 규약 — URL 설계, 
 | `DRAW_NUMBER_OUT_OF_RANGE` | 400 | 1~45 밖 숫자 |
 | `DRAW_FIXED_EXCLUDED_OVERLAP` | 400 | 고정·제외 번호 겹침 |
 | `DRAW_NOT_ENOUGH_CANDIDATES` | 400 | 후보 6개 미만 |
+| `RECOMMENDATION_TOO_MANY_FIXED` | 400 | 고정 번호 5개 초과 |
+| `RECOMMENDATION_NO_HISTORY` | 409 | 추천에 쓸 회차 데이터 없음 |
 | `AUTH_REQUIRED` | 401 | 세션 없음 또는 만료 |
 | `AUTH_INVALID_CODE` | 400 | OTP 코드 틀림 또는 재사용 |
 | `AUTH_LOCKED` | 429 | 연속 5회 실패로 15분 잠금 |
