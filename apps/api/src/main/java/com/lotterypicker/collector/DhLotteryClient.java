@@ -178,11 +178,11 @@ public class DhLotteryClient {
 		try {
 			response = restClient.get().uri(uri).retrieve().toEntity(String.class);
 		} catch (RestClientException e) {
-			throw new CollectorException("동행복권 요청에 실패했습니다: " + uri.getPath(), e);
+			throw new CollectorUnavailableException("동행복권 요청에 실패했습니다: " + uri.getPath(), e);
 		}
 		MediaType contentType = response.getHeaders().getContentType();
 		if (contentType == null || !MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
-			throw new CollectorException("JSON이 아닌 응답입니다: " + uri.getPath() + " (" + contentType + ")");
+			throw new CollectorUnavailableException("JSON이 아닌 응답입니다: " + uri.getPath() + " (" + contentType + ")");
 		}
 		JsonNode list;
 		try {

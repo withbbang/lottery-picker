@@ -5,6 +5,14 @@ spring:
     default: local
   jpa:
     open-in-view: false
+  http:
+    clients:
+      connect-timeout: 5s
+      read-timeout: 30s
+  task:
+    scheduling:
+      pool:
+        size: 2
 
 app:
   auth:

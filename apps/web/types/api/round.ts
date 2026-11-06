@@ -29,5 +29,5 @@ export type WinningStoreResponse = {
   name: string;
   address: string;
   purchaseType: string | null;
-  status: string;
+  status: string | null;
 };

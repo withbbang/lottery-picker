@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.lotterypicker.collector.CollectorException;
+import com.lotterypicker.collector.CollectorUnavailableException;
 import com.lotterypicker.collector.DhLotteryClient;
 import com.lotterypicker.collector.PrizeTier;
 import com.lotterypicker.collector.RoundPayload;
@@ -261,6 +262,64 @@ class CollectorServiceTest {
 		// then
 		assertThat(db.get(1).getStoreFetchedAt()).isNull();
 		assertThat(db.get(2).getStoreFetchedAt()).isEqualTo(LocalDateTime.of(2026, 11, 6, 12, 0));
+	}
+
+	@Test
+	void 한_회차_판매점이_실패해도_이후_회차를_계속_수집하고_끝에_예외를_던진다() {
+		// given
+		seedRound(1, LocalDate.of(2026, 1, 1), null);
+		seedRound(2, LocalDate.of(2026, 1, 1), null);
+		seedRound(3, LocalDate.of(2026, 1, 1), null);
+		when(client.fetchStores(1)).thenReturn(List.of(store(1, "가")));
+		when(client.fetchStores(2)).thenThrow(new CollectorException("문자열 필드가 없거나 비어 있습니다: shpNm"));
+		when(client.fetchStores(3)).thenReturn(List.of(store(1, "다")));
+
+		// when, then
+		assertThatThrownBy(service::syncStores)
+			.isInstanceOf(CollectorException.class)
+			.hasMessageContaining("2");
+		assertThat(db.get(1).getStoreFetchedAt()).isNotNull();
+		assertThat(db.get(2).getStoreFetchedAt()).isNull();
+		assertThat(db.get(3).getStoreFetchedAt()).isNotNull();
+		assertThat(savedStores).extracting(WinningStore::getName).containsExactly("가", "다");
+	}
+
+	@Test
+	void 연속_3회_요청_자체가_실패하면_남은_회차를_건너뛰고_예외를_던진다() {
+		// given
+		for (int r = 1; r <= 6; r++) {
+			seedRound(r, LocalDate.of(2026, 1, 1), null);
+		}
+		when(client.fetchStores(anyInt())).thenAnswer(i -> {
+			if ((int) i.getArgument(0) == 1) {
+				return List.of(store(1, "가"));
+			}
+			throw new CollectorUnavailableException("동행복권 요청에 실패했습니다", new RuntimeException());
+		});
+
+		// when, then
+		assertThatThrownBy(service::syncStores).isInstanceOf(CollectorException.class);
+		verify(client, times(4)).fetchStores(anyInt());
+		verify(client, never()).fetchStores(5);
+		assertThat(db.get(1).getStoreFetchedAt()).isNotNull();
+	}
+
+	@Test
+	void 요청_실패_사이에_성공이_있으면_연속_횟수를_세지_않는다() {
+		// given
+		for (int r = 1; r <= 6; r++) {
+			seedRound(r, LocalDate.of(2026, 1, 1), null);
+		}
+		when(client.fetchStores(anyInt())).thenAnswer(i -> {
+			if ((int) i.getArgument(0) % 2 == 0) {
+				return List.of(store(1, "가"));
+			}
+			throw new CollectorUnavailableException("동행복권 요청에 실패했습니다", new RuntimeException());
+		});
+
+		// when, then
+		assertThatThrownBy(service::syncStores).isInstanceOf(CollectorException.class);
+		verify(client, times(6)).fetchStores(anyInt());
 	}
 
 	@Test

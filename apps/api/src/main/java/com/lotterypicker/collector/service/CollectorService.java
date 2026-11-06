@@ -1,6 +1,7 @@
 package com.lotterypicker.collector.service;
 
 import com.lotterypicker.collector.CollectorException;
+import com.lotterypicker.collector.CollectorUnavailableException;
 import com.lotterypicker.collector.DhLotteryClient;
 import com.lotterypicker.collector.PrizeTier;
 import com.lotterypicker.collector.RoundPayload;
@@ -28,6 +29,9 @@ public class CollectorService {
 
 	/** 추첨 후 이 일수가 지나도 판매점이 비어 있으면 없는 것으로 보고 완료 처리한다. */
 	private static final int STORE_RETRY_DAYS = 7;
+
+	/** 요청 자체가 이만큼 연속 실패하면 사이트 전체 문제로 보고 판매점 수집을 멈춘다. */
+	private static final int MAX_CONSECUTIVE_UNAVAILABLE = 3;
 
 	private final DhLotteryClient client;
 	private final LottoRoundRepository roundRepository;
@@ -79,21 +83,48 @@ public class CollectorService {
 		}
 	}
 
-	/** 판매점을 아직 받지 못한 회차의 판매점을 수집한다. 빈 결과는 추첨 후 7일이 지나야 완료로 본다. */
+	/**
+	 * 판매점을 아직 받지 못한 회차의 판매점을 수집한다. 빈 결과는 추첨 후 7일이 지나야 완료로 본다.
+	 * 한 회차가 실패해도 다음 회차를 계속 받고, 끝에 실패한 회차를 모아 예외로 알린다. 실패한 회차는 다음 실행에서 다시 시도한다.
+	 * 요청 자체가 {@link #MAX_CONSECUTIVE_UNAVAILABLE}번 연속 실패하면 사이트 문제로 보고 남은 회차를 건너뛴다.
+	 */
 	public void syncStores() {
 		LocalDate today = LocalDate.now(clock);
+		List<Integer> failed = new ArrayList<>();
+		int unavailableStreak = 0;
 		for (LottoRound round : roundRepository.findByStoreFetchedAtIsNullOrderByRoundNoAsc()) {
-			List<StorePayload> payloads = client.fetchStores(round.getRoundNo());
-			boolean giveUp = today.isAfter(round.getDrawDate().plusDays(STORE_RETRY_DAYS));
-			if (payloads.isEmpty() && !giveUp) {
-				continue;
+			try {
+				syncStores(round, today);
+				unavailableStreak = 0;
+			} catch (CollectorUnavailableException e) {
+				failed.add(round.getRoundNo());
+				log.warn("{}회 판매점 수집 실패(요청 불가)", round.getRoundNo(), e);
+				if (++unavailableStreak >= MAX_CONSECUTIVE_UNAVAILABLE) {
+					log.error("요청 실패가 {}회 연속이라 남은 회차의 판매점 수집을 중단합니다.", unavailableStreak);
+					break;
+				}
+			} catch (CollectorException e) {
+				failed.add(round.getRoundNo());
+				unavailableStreak = 0;
+				log.warn("{}회 판매점 수집 실패", round.getRoundNo(), e);
 			}
-			transactions.executeWithoutResult(status -> {
-				storeRepository.saveAll(payloads.stream().map(p -> toEntity(round, p)).toList());
-				round.markStoresFetched(LocalDateTime.now(clock));
-				roundRepository.save(round);
-			});
 		}
+		if (!failed.isEmpty()) {
+			throw new CollectorException("판매점 수집에 실패한 회차: " + failed);
+		}
+	}
+
+	private void syncStores(LottoRound round, LocalDate today) {
+		List<StorePayload> payloads = client.fetchStores(round.getRoundNo());
+		boolean giveUp = today.isAfter(round.getDrawDate().plusDays(STORE_RETRY_DAYS));
+		if (payloads.isEmpty() && !giveUp) {
+			return;
+		}
+		transactions.executeWithoutResult(status -> {
+			storeRepository.saveAll(payloads.stream().map(p -> toEntity(round, p)).toList());
+			round.markStoresFetched(LocalDateTime.now(clock));
+			roundRepository.save(round);
+		});
 	}
 
 	private LottoRound toEntity(RoundPayload payload) {
