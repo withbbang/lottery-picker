@@ -9,6 +9,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -26,6 +27,16 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException e) {
 		List<ApiResponse.FieldReason> fields = e.getBindingResult().getFieldErrors().stream()
 				.map(error -> new ApiResponse.FieldReason(error.getField(), error.getDefaultMessage()))
+				.toList();
+		ErrorCode code = ErrorCode.COMMON_VALIDATION_FAILED;
+		return ResponseEntity.status(code.getStatus()).body(ApiResponse.failure(code, fields));
+	}
+
+	@ExceptionHandler(HandlerMethodValidationException.class)
+	public ResponseEntity<ApiResponse<Void>> handleMethodValidation(HandlerMethodValidationException e) {
+		List<ApiResponse.FieldReason> fields = e.getParameterValidationResults().stream()
+				.flatMap(result -> result.getResolvableErrors().stream().map(error -> new ApiResponse.FieldReason(
+						result.getMethodParameter().getParameterName(), error.getDefaultMessage())))
 				.toList();
 		ErrorCode code = ErrorCode.COMMON_VALIDATION_FAILED;
 		return ResponseEntity.status(code.getStatus()).body(ApiResponse.failure(code, fields));

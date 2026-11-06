@@ -20,6 +20,10 @@ function isAuthRequired(error: unknown): boolean {
   return error instanceof ApiError && error.code === "AUTH_REQUIRED";
 }
 
+function isNotFound(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "COMMON_NOT_FOUND";
+}
+
 function createAuthAwareClient(moveToLogin: () => void) {
   let redirecting = false;
 
@@ -41,7 +45,9 @@ function createAuthAwareClient(moveToLogin: () => void) {
     defaultOptions: {
       queries: {
         retry: (failureCount, error) =>
-          !isAuthRequired(error) && failureCount < MAX_QUERY_RETRIES,
+          !isAuthRequired(error) &&
+          !isNotFound(error) &&
+          failureCount < MAX_QUERY_RETRIES,
       },
     },
   });

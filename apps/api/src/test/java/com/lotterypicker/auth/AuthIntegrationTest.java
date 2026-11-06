@@ -129,8 +129,9 @@ class AuthIntegrationTest {
 		Cookie cookie = new Cookie("LP_SESSION", setCookie.substring("LP_SESSION=".length(), setCookie.indexOf(';')));
 
 		// when, then
-		mockMvc.perform(get("/api/v1/rounds").cookie(cookie))
-				.andExpect(status().isNotFound());
+		mockMvc.perform(get("/api/v1/rounds/0").cookie(cookie))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error.code").value("COMMON_NOT_FOUND"));
 
 		var logout = mockMvc.perform(delete("/api/v1/sessions").cookie(cookie))
 				.andExpect(status().isNoContent());
