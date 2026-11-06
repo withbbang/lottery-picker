@@ -44,6 +44,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -188,6 +189,29 @@ class DailyRecommendationServiceTest {
 
 		// when, then
 		assertThatThrownBy(() -> service.generateIfAbsent(DATE)).isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
+	void 잠금_실패여도_다른_쪽이_저장했으면_빈_값이다() {
+		// given: 데드락 희생자가 됐지만 다른 쪽이 한 벌을 저장했다
+		when(repository.existsByDate(DATE)).thenReturn(false, true);
+		when(repository.saveAll(anyIterable())).thenThrow(new CannotAcquireLockException("deadlock"));
+
+		// when
+		Optional<RecommendationSet> result = service.generateIfAbsent(DATE);
+
+		// then
+		assertThat(result).isEmpty();
+	}
+
+	@Test
+	void 잠금_실패인데_그날_추천이_없으면_숨기지_않는다() {
+		// given
+		when(repository.existsByDate(DATE)).thenReturn(false);
+		when(repository.saveAll(anyIterable())).thenThrow(new CannotAcquireLockException("lock timeout"));
+
+		// when, then
+		assertThatThrownBy(() -> service.generateIfAbsent(DATE)).isInstanceOf(CannotAcquireLockException.class);
 	}
 
 	@Test

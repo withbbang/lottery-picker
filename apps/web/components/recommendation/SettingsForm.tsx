@@ -38,7 +38,7 @@ function saveSettings(
 }
 
 export function SettingsForm() {
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending } = useQuery({
     queryKey: SETTINGS_KEY,
     queryFn: () => apiFetch<RecommendationSettingsResponse>(SETTINGS_PATH),
   });
@@ -46,7 +46,8 @@ export function SettingsForm() {
   if (isPending) {
     return <p>설정을 불러오는 중…</p>;
   }
-  if (isError) {
+  // 백그라운드 재조회 실패는 데이터가 남아 있다. 폼을 내리면 입력 중인 값이 사라진다.
+  if (!data) {
     return <p role="alert">설정을 불러오지 못했습니다.</p>;
   }
   return <SettingsFields initial={data} />;

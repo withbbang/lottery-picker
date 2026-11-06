@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -98,6 +98,58 @@ describe("SettingsForm", () => {
 
     // then
     await waitFor(() => expect(getCalls()).toHaveLength(2));
+  });
+
+  it("keeps the form and typed input when a background refetch fails", async () => {
+    // given
+    mockApi({ fixed: [], excluded: [] });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <SettingsForm />
+      </QueryClientProvider>,
+    );
+    const fixed = await screen.findByRole("textbox", { name: "고정 번호" });
+    await userEvent.type(fixed, "7, 3");
+    fetchMock.mockRejectedValue(new TypeError("network"));
+
+    // when
+    // React Query는 구독자 알림을 타이머로 미루므로 다시 그릴 때까지 기다린다.
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ["recommendation-settings"] });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    // then
+    expect(
+      client.getQueryState(["recommendation-settings"])?.status,
+    ).toBe("error");
+    expect(screen.getByRole("textbox", { name: "고정 번호" })).toHaveValue(
+      "7, 3",
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows an error when the first load fails", async () => {
+    // given
+    fetchMock.mockRejectedValue(new TypeError("network"));
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    // when
+    render(
+      <QueryClientProvider client={client}>
+        <SettingsForm />
+      </QueryClientProvider>,
+    );
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "설정을 불러오지 못했습니다.",
+    );
   });
 
   it("shows the saved values when opened", async () => {

@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -81,8 +82,8 @@ public class DailyRecommendationService {
 				latest.getRoundNo());
 		try {
 			transactions.executeWithoutResult(status -> repository.saveAll(rows));
-		} catch (DataIntegrityViolationException e) {
-			// 유니크 위반이면 다른 쪽이 먼저 저장한 것이다. 그날 추천이 없으면 다른 저장 실패이므로 숨기지 않는다.
+		} catch (DataIntegrityViolationException | PessimisticLockingFailureException e) {
+			// 유니크 위반이나 잠금 실패는 다른 쪽이 먼저 저장했을 수 있다. 그날 추천이 없으면 다른 저장 실패이므로 숨기지 않는다.
 			if (repository.existsByDate(date)) {
 				return Optional.empty();
 			}
