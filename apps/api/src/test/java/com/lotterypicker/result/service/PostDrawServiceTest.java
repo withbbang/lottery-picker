@@ -2,6 +2,7 @@ package com.lotterypicker.result.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -308,6 +309,50 @@ class PostDrawServiceTest {
 		// then: 1249(7일 내)과 1248(경계 7일)만 알리고 1247은 건드리지 않는다
 		verify(telegram, times(2)).send(anyString());
 		assertThat(results.findByRoundNo(1247)).isEmpty();
+	}
+
+	@Test
+	void 추첨_후_7일이_지난_회차는_발송_실패여도_재발송하지_않는다() {
+		// given: 10/31 추첨 당일 발송이 3회 모두 실패했다
+		rounds.save(round(1248, LocalDate.of(2026, 10, 31), LocalDateTime.of(2026, 10, 31, 20, 45)));
+		saveWeek(1248, LocalDate.of(2026, 10, 31));
+		doThrow(new TelegramException("down")).when(telegram).send(anyString());
+		serviceOn("2026-10-31T20:45").process(1248);
+		doNothing().when(telegram).send(anyString());
+
+		// when: 8일 뒤(새 회차 추첨 다음 날)에 텔레그램이 복구됐다
+		serviceOn("2026-11-08T10:00").resendUnsent();
+
+		// then: 지난주 회차를 새 소식처럼 보내지 않는다
+		verify(telegram, times(3)).send(anyString());
+	}
+
+	@Test
+	void 텔레그램이_설정되지_않았으면_재발송_처리를_하지_않는다() {
+		// given
+		when(telegram.isConfigured()).thenReturn(false);
+		rounds.save(round(1249, DRAW_DATE, LocalDateTime.of(2026, 11, 7, 20, 45)));
+		saveWeek(1249, DRAW_DATE);
+
+		// when
+		serviceOn("2026-11-07T21:00").resendUnsent();
+
+		// then: 5분마다 헛도는 조회를 하지 않는다. 채점은 수집 경로의 대기 회차 처리가 맡는다
+		assertThat(results.findByRoundNo(1249)).isEmpty();
+	}
+
+	@Test
+	void 늦게_수집한_오래된_회차도_수집_경로에서는_채점하고_알린다() {
+		// given: 서버가 오래 꺼져 있다가 추천이 있던 회차를 9일 뒤에 수집했다
+		rounds.save(round(1249, DRAW_DATE, LocalDateTime.of(2026, 11, 16, 9, 0)));
+		saveWeek(1249, DRAW_DATE);
+
+		// when
+		serviceOn("2026-11-16T09:00").process(1249);
+
+		// then
+		assertThat(results.findByRoundNo(1249)).hasSize(70);
+		assertThat(sentText()).contains("당첨번호를 늦게 수집했습니다(2026-11-16 09:00).");
 	}
 
 	@Test

@@ -19,4 +19,6 @@ export type RoundResultResponse = {
   prizeTotal: number;
   cost: number;
   profit: number;
+  /** 추천은 있는데 아직 채점하지 않은 줄이 있으면 true */
+  pending: boolean;
 };

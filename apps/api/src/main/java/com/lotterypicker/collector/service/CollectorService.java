@@ -49,7 +49,10 @@ public class CollectorService {
 		this.clock = clock;
 	}
 
-	/** 이번에 저장한 회차를 오름차순으로 돌려준다. 이미 실행 중이면 아무것도 하지 않고 빈 목록을 돌려준다. */
+	/**
+	 * 이번에 저장한 회차를 오름차순으로 돌려준다. 이미 실행 중이면 아무것도 하지 않고 빈 목록을 돌려준다.
+	 * 당첨금이 아직 공개되지 않은 회차는 오류 없이 건너뛰고 다음 실행에서 다시 받는다.
+	 */
 	public List<Integer> syncMissingRounds() {
 		if (!roundLock.tryLock()) {
 			log.info("회차 수집이 이미 실행 중이라 건너뜁니다.");
@@ -70,10 +73,16 @@ public class CollectorService {
 					throw new CollectorException("요청한 " + target + "회가 응답 페이지에 없습니다.");
 				}
 				for (RoundPayload payload : page) {
-					if (missing.remove(payload.round())) {
-						roundRepository.save(toEntity(payload));
-						saved.add(payload.round());
+					if (!missing.remove(payload.round())) {
+						continue;
 					}
+					if (!payload.prizesPublished()) {
+						// 금액 없이 저장하면 채점 결과가 0원으로 굳는다. 다음 확인에서 다시 받는다.
+						log.info("{}회 당첨금이 아직 공개되지 않아 이번에는 저장하지 않습니다.", payload.round());
+						continue;
+					}
+					roundRepository.save(toEntity(payload));
+					saved.add(payload.round());
 				}
 				log.info("회차 수집: 남은 {}건", missing.size());
 			}

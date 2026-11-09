@@ -45,6 +45,9 @@ export function RoundResults({ round }: { round: number }) {
   if (isError) {
     return <p role="alert">추천 비교를 불러오지 못했습니다.</p>;
   }
+  if (data.pending) {
+    return <p>아직 비교 결과를 계산하지 않았습니다.</p>;
+  }
   if (data.lines.length === 0) {
     return <p>이 회차 추천이 없습니다.</p>;
   }

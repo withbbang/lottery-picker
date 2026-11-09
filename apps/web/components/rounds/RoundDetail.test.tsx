@@ -64,6 +64,7 @@ function mockApi(stores: WinningStoreResponse[], round: unknown = detail) {
         prizeTotal: 0,
         cost: 0,
         profit: 0,
+        pending: false,
       });
     }
     if (round === null) {

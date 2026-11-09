@@ -39,6 +39,7 @@ const scored: RoundResultResponse = {
   prizeTotal: 55000,
   cost: 3000,
   profit: 52000,
+  pending: false,
 };
 
 function renderResults(data: RoundResultResponse) {
@@ -113,6 +114,7 @@ describe("RoundResults", () => {
       prizeTotal: 0,
       cost: 0,
       profit: 0,
+      pending: false,
     });
 
     // then
@@ -120,5 +122,33 @@ describe("RoundResults", () => {
       await screen.findByText("이 회차 추천이 없습니다."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/가상 금액/)).not.toBeInTheDocument();
+  });
+
+  it("shows a neutral message while results are not computed yet", async () => {
+    // when
+    renderResults({
+      round: 1249,
+      lines: [],
+      rankCounts: {
+        FIRST: 0,
+        SECOND: 0,
+        THIRD: 0,
+        FOURTH: 0,
+        FIFTH: 0,
+        NONE: 0,
+      },
+      prizeTotal: 0,
+      cost: 0,
+      profit: 0,
+      pending: true,
+    });
+
+    // then
+    expect(
+      await screen.findByText("아직 비교 결과를 계산하지 않았습니다."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("이 회차 추천이 없습니다."),
+    ).not.toBeInTheDocument();
   });
 });

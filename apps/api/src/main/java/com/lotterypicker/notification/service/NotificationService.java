@@ -51,6 +51,11 @@ public class NotificationService {
 		return deliver(kind, targetKey, text);
 	}
 
+	/** 텔레그램 설정이 있어 실제로 보낼 수 있는지. 없으면 sendOnce는 기록 없이 SKIPPED다. */
+	public boolean isEnabled() {
+		return telegram.isConfigured();
+	}
+
 	public NotificationStatus statusOf(NotificationKind kind, String targetKey) {
 		return logs.findByKindAndTargetKey(kind, targetKey)
 			.map(NotificationLog::getStatus)

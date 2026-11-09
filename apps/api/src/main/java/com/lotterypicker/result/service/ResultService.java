@@ -28,7 +28,7 @@ public class ResultService {
 	private final DailyRecommendationRepository recommendations;
 	private final RecommendationResultRepository results;
 
-	/** 채점된 추천 줄만 돌려준다. 대조군은 성적표 전용이라 뺀다. */
+	/** 채점된 추천 줄만 돌려준다. 대조군은 성적표 전용이라 뺀다. 채점 전인 추천 줄이 있으면 pending이다. */
 	public RoundResultResponse roundResults(int round) {
 		if (!rounds.existsById(round)) {
 			throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
@@ -38,16 +38,21 @@ public class ResultService {
 
 		List<RoundResultLineResponse> lines = new ArrayList<>();
 		List<RecommendationResult> scored = new ArrayList<>();
+		boolean pending = false;
 		for (DailyRecommendation line : recommendations.findByRoundNoOrderByDateAscLineIndexAsc(round)) {
+			if (line.isControl()) {
+				continue;
+			}
 			RecommendationResult result = byLine.get(line.getId());
-			if (line.isControl() || result == null) {
+			if (result == null) {
+				pending = true;
 				continue;
 			}
 			scored.add(result);
 			lines.add(new RoundResultLineResponse(line.getDate(), line.getStrategy(), line.numbers().values(),
 					result.getMatchCount(), result.getPrizeRank(), result.getPrizeAmount()));
 		}
-		return RoundResultResponse.of(round, lines, ResultTally.of(scored));
+		return RoundResultResponse.of(round, lines, ResultTally.of(scored), pending);
 	}
 
 }

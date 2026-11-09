@@ -167,6 +167,32 @@ class DhLotteryClientTest {
 	}
 
 	@Test
+	void 아직_비어_있는_당첨금_필드는_0으로_읽는다() throws IOException {
+		// given: 추첨 직후에는 당첨자 수와 금액이 null일 수 있다
+		respondJson(ROUND_URL, fixture("round-page-1248.json")
+			.replaceFirst("\"rnk4WnAmt\":50000", "\"rnk4WnAmt\":null")
+			.replaceFirst("\"rnk5WnNope\":2723467", "\"rnk5WnNopeX\":1"));
+
+		// when
+		RoundPayload payload = client.fetchRoundPage(1248).stream()
+			.filter(p -> p.round() == 1248).findFirst().orElseThrow();
+
+		// then
+		assertThat(payload.tiers().get(3).amountPerWinner()).isZero();
+		assertThat(payload.tiers().get(4).winnerCount()).isZero();
+		assertThat(payload.prizesPublished()).isFalse();
+	}
+
+	@Test
+	void 당첨금_필드가_숫자가_아니면_CollectorException이다() throws IOException {
+		// given
+		respondJson(ROUND_URL, fixture("round-page-1248.json").replaceFirst("\"rnk4WnAmt\":50000", "\"rnk4WnAmt\":\"x\""));
+
+		// when & then
+		assertThatThrownBy(() -> client.fetchRoundPage(1248)).isInstanceOf(CollectorException.class);
+	}
+
+	@Test
 	void 필수_필드가_없으면_CollectorException이다() throws IOException {
 		// given
 		respondJson(ROUND_URL, fixture("round-page-1248.json").replaceFirst("\"tm6WnNo\"", "\"tm6WnNoX\""));

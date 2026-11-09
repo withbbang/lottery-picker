@@ -159,7 +159,7 @@ public class DhLotteryClient {
 		}
 		List<PrizeTier> tiers = new ArrayList<>();
 		for (int rank = 1; rank <= TIER_COUNT; rank++) {
-			tiers.add(new PrizeTier(rank, longOf(node, "rnk" + rank + "WnNope"), longOf(node, "rnk" + rank + "WnAmt")));
+			tiers.add(new PrizeTier(rank, prizeLongOf(node, "rnk" + rank + "WnNope"), prizeLongOf(node, "rnk" + rank + "WnAmt")));
 		}
 		return new RoundPayload(round, numbers, bonus, dateOf(node, "ltRflYmd"), List.copyOf(tiers));
 	}
@@ -219,6 +219,15 @@ public class DhLotteryClient {
 			throw new CollectorException("정수 필드가 없거나 형식이 다릅니다: " + field);
 		}
 		return value.intValue();
+	}
+
+	/** 당첨자 수와 금액은 추첨 직후 비어 있을 수 있어 없거나 null이면 0으로 읽는다. 숫자가 아닌 값은 형식 오류다. */
+	private static long prizeLongOf(JsonNode node, String field) {
+		JsonNode value = node.path(field);
+		if (value.isMissingNode() || value.isNull()) {
+			return 0;
+		}
+		return longOf(node, field);
 	}
 
 	private static long longOf(JsonNode node, String field) {

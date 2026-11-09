@@ -1,6 +1,7 @@
 package com.lotterypicker.collector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -28,6 +29,10 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -153,6 +158,49 @@ class CollectionJobTest {
 	}
 
 	@Test
+	void 한_회차_처리가_실패해도_나머지_회차를_처리한다() {
+		// given
+		when(collector.syncMissingRounds()).thenReturn(List.of(1248, 1249));
+		doThrow(new IllegalStateException("db")).when(postDraw).process(1248);
+
+		// when: 기동 경로. 예외가 새지 않아야 판매점 수집까지 간다
+		assertThatCode(jobAt("2026-11-13T12:00")::collectRounds).doesNotThrowAnyException();
+
+		// then
+		verify(postDraw).process(1249);
+	}
+
+	@Test
+	void 판매점_수집은_다른_수집이_잠금을_풀_때까지_기다렸다가_돈다() throws Exception {
+		// given: 5분 확인이 잠금을 잠깐 잡고 있다
+		CountDownLatch held = new CountDownLatch(1);
+		ExecutorService other = Executors.newSingleThreadExecutor();
+		try {
+			other.submit(() -> lock.tryRun("5분 확인", () -> {
+				held.countDown();
+				sleep(300);
+			}));
+			held.await(5, TimeUnit.SECONDS);
+
+			// when
+			jobAt("2026-11-09T06:02").syncStoresDaily();
+
+			// then
+			verify(collector).syncStores();
+		} finally {
+			other.shutdownNow();
+		}
+	}
+
+	private static void sleep(long millis) {
+		try {
+			Thread.sleep(millis);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	@Test
 	void 확인_시각이_아니면_수집기를_부르지_않는다() {
 		// when
 		jobAt("2026-11-08T00:05").poll();
@@ -188,20 +236,16 @@ class CollectionJobTest {
 	}
 
 	@Test
-	void 다른_수집이_실행_중이면_이번_실행은_건너뛴다() {
+	void 다른_수집이_실행_중이면_5분_확인은_건너뛴다() {
 		// given
 		CollectionJob job = jobAt("2026-11-07T20:40");
 
 		// when: 기동 수집이 잠금을 잡고 있는 동안 5분 확인이 돈다
-		boolean ran = lock.tryRun("기동 수집", () -> {
-			job.poll();
-			job.syncStoresDaily();
-		});
+		boolean ran = lock.tryRun("기동 수집", job::poll);
 
 		// then
 		assertThat(ran).isTrue();
 		verify(collector, never()).syncMissingRounds();
-		verify(collector, never()).syncStores();
 		verify(postDraw, never()).resendUnsent();
 	}
 

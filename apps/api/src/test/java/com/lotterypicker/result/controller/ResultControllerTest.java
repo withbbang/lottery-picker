@@ -154,9 +154,42 @@ class ResultControllerTest {
 		// then
 		result.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.lines").isEmpty())
+			.andExpect(jsonPath("$.data.pending").value(false))
 			.andExpect(jsonPath("$.data.cost").value(0))
 			.andExpect(jsonPath("$.data.prizeTotal").value(0))
 			.andExpect(jsonPath("$.data.profit").value(0));
+	}
+
+	@Test
+	void 추천은_있는데_채점_전이면_pending이다() throws Exception {
+		// given: 당첨번호는 저장됐지만 아직 채점하지 않았다
+		given(rounds.existsById(ROUND)).willReturn(true);
+		given(recommendations.findByRoundNoOrderByDateAscLineIndexAsc(ROUND))
+			.willReturn(List.of(line(1, SATURDAY, StrategyType.RECENT_HOT, 0), line(2, SATURDAY, StrategyType.CONTROL, 5)));
+		given(results.findByRoundNo(ROUND)).willReturn(List.of());
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/rounds/1249/results"));
+
+		// then
+		result.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.pending").value(true));
+	}
+
+	@Test
+	void 대조군만_채점_전이면_pending이_아니다() throws Exception {
+		// given
+		given(rounds.existsById(ROUND)).willReturn(true);
+		given(recommendations.findByRoundNoOrderByDateAscLineIndexAsc(ROUND))
+			.willReturn(List.of(line(1, SATURDAY, StrategyType.RECENT_HOT, 0), line(2, SATURDAY, StrategyType.CONTROL, 5)));
+		given(results.findByRoundNo(ROUND)).willReturn(List.of(result(1, 0, PrizeRank.NONE, 0)));
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/rounds/1249/results"));
+
+		// then
+		result.andExpect(jsonPath("$.data.pending").value(false))
+			.andExpect(jsonPath("$.data.lines.length()").value(1));
 	}
 
 	@Test

@@ -206,6 +206,62 @@ class CollectorServiceTest {
 		verify(client, never()).fetchRoundPage(20);
 	}
 
+	private static RoundPayload unpublishedPayload(int round) {
+		// 추첨 직후: 번호는 나왔지만 3~5등 당첨자 수와 금액이 아직 비어 있다. 1등은 없을 수도 있으므로 보지 않는다
+		return new RoundPayload(round, new LottoNumbers(List.of(1, 2, 3, 4, 5, 6)), 7, LocalDate.of(2026, 11, 7),
+			List.of(new PrizeTier(1, 0L, 0L), new PrizeTier(2, 0L, 0L), new PrizeTier(3, 0L, 0L),
+				new PrizeTier(4, 0L, 0L), new PrizeTier(5, 0L, 0L)));
+	}
+
+	@Test
+	void 당첨금이_아직_공개되지_않은_회차는_저장하지_않고_예외도_없다() {
+		// given
+		seedRound(1, LocalDate.of(2026, 10, 31), LocalDateTime.of(2026, 11, 1, 0, 0));
+		when(client.fetchRoundList()).thenReturn(list(2));
+		when(client.fetchRoundPage(2)).thenReturn(List.of(unpublishedPayload(2), payload(1)));
+
+		// when
+		List<Integer> saved = service.syncMissingRounds();
+
+		// then: 다음 확인에서 다시 받는다
+		assertThat(saved).isEmpty();
+		assertThat(db.keySet()).containsExactly(1);
+	}
+
+	@Test
+	void 당첨금이_공개된_뒤에는_저장한다() {
+		// given
+		seedRound(1, LocalDate.of(2026, 10, 31), LocalDateTime.of(2026, 11, 1, 0, 0));
+		when(client.fetchRoundList()).thenReturn(list(2));
+		when(client.fetchRoundPage(2))
+			.thenReturn(List.of(unpublishedPayload(2), payload(1)))
+			.thenReturn(List.of(payload(2), payload(1)));
+		service.syncMissingRounds();
+
+		// when
+		List<Integer> saved = service.syncMissingRounds();
+
+		// then
+		assertThat(saved).containsExactly(2);
+		assertThat(db.get(2).getRank5Amount()).isEqualTo(5_000L);
+	}
+
+	@Test
+	void 일등_당첨자가_없어도_3등부터_5등이_있으면_저장한다() {
+		// given
+		when(client.fetchRoundList()).thenReturn(list(1));
+		when(client.fetchRoundPage(1)).thenReturn(List.of(new RoundPayload(1,
+			new LottoNumbers(List.of(1, 2, 3, 4, 5, 6)), 7, LocalDate.of(2026, 1, 1),
+			List.of(new PrizeTier(1, 0L, 0L), new PrizeTier(2, 0L, 0L), new PrizeTier(3, 3265L, 1_480_597L),
+				new PrizeTier(4, 167_745L, 50_000L), new PrizeTier(5, 2_723_467L, 5_000L)))));
+
+		// when
+		List<Integer> saved = service.syncMissingRounds();
+
+		// then
+		assertThat(saved).containsExactly(1);
+	}
+
 	@Test
 	void 요청한_회차가_페이지에_없으면_CollectorException이다() {
 		// given

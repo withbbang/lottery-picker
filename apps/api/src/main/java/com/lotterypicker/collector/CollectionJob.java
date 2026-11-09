@@ -9,6 +9,7 @@ import com.lotterypicker.result.service.PostDrawService;
 import com.lotterypicker.round.entity.LottoRound;
 import com.lotterypicker.round.repository.LottoRoundRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -22,8 +23,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * 새 회차를 확인해 수집하고, 새 회차와 채점 대기 회차를 처리한다. 5분마다 깨지만 {@link PollPolicy}가 정한 시각에만
- * 사이트를 부른다. 06:02에는 판매점을 수집한다. 5분 확인과 같은 순간에 돌면 잠금을 못 잡아 그날 건너뛰므로
- * 5분 격자를 피한다. 기동 수집과 같은 {@link CollectionLock}으로 서로 겹치지 않게 한다.
+ * 사이트를 부른다. 06:02에는 판매점을 수집한다. 기동 수집과 같은 {@link CollectionLock}으로 서로 겹치지 않게 한다.
+ * 5분 확인은 텔레그램 재시도나 지연 수집으로 잠금을 몇 분 잡을 수 있으므로, 판매점 수집은 건너뛰지 않고
+ * 최대 {@link #STORE_SYNC_LOCK_WAIT}만큼 기다린다. 5분 격자를 피한 시각은 같은 순간 경합을 줄이기 위해서다.
  * 수집기 예외는 기대 추첨일을 키로 COLLECTION_ERROR를 알린다. 수집기는 파싱에 성공한 회차만 저장한다.
  */
 @Slf4j
@@ -33,6 +35,8 @@ import org.springframework.stereotype.Component;
 public class CollectionJob {
 
 	private static final int DAYS_PER_ROUND = 7;
+
+	static final Duration STORE_SYNC_LOCK_WAIT = Duration.ofMinutes(10);
 
 	private final CollectorService collector;
 	private final PostDrawService postDraw;
@@ -75,7 +79,7 @@ public class CollectionJob {
 
 	@Scheduled(cron = "0 2 6 * * *", zone = "Asia/Seoul")
 	public void syncStoresDaily() {
-		lock.tryRun("판매점 수집", this::collectStores);
+		lock.runWaiting("판매점 수집", STORE_SYNC_LOCK_WAIT, this::collectStores);
 	}
 
 	/** 잠금 없이 회차를 수집하고 새 회차와 대기 회차를 처리한다. 호출하는 쪽이 잠금을 잡는다. */
@@ -89,7 +93,14 @@ public class CollectionJob {
 		}
 		TreeSet<Integer> targets = new TreeSet<>(collected);
 		targets.addAll(postDraw.pendingRounds());
-		targets.forEach(postDraw::process);
+		// 한 회차가 실패해도 나머지 회차와 이어지는 판매점 수집은 계속한다. 실패한 회차는 대기 회차로 다시 잡힌다.
+		for (int round : targets) {
+			try {
+				postDraw.process(round);
+			} catch (RuntimeException e) {
+				log.error("{}회 추첨 후 처리 실패", round, e);
+			}
+		}
 	}
 
 	/** 잠금 없이 판매점을 수집한다. 호출하는 쪽이 잠금을 잡는다. */

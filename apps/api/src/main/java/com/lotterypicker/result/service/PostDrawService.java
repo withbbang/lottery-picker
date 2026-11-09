@@ -37,8 +37,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class PostDrawService {
 
-	/** 추천이 없는 회차는 추첨일로부터 이 일수 안일 때만 알린다. 초기 적재한 지난 회차는 알리지 않는다. */
-	private static final int NOTIFY_WITHOUT_RECOMMENDATION_DAYS = 7;
+	/**
+	 * 추천이 없는 회차는 추첨일로부터 이 일수 안일 때만 알린다. 초기 적재한 지난 회차는 알리지 않는다.
+	 * 재발송도 이 기간 안의 회차만 한다.
+	 */
+	private static final int NOTIFY_WINDOW_DAYS = 7;
 
 	private final LottoRoundRepository rounds;
 	private final DailyRecommendationRepository recommendations;
@@ -63,19 +66,28 @@ public class PostDrawService {
 
 	/**
 	 * 종료 알림을 아직 보내지 못한 최근 회차를 다시 처리한다. 발송 실패(FAILED)나 채점 후 알림 전에 멈춘 경우를 잡는다.
-	 * 7일 안의 회차는 최신 회차와 직전 회차뿐이므로 두 회차만 본다. 이미 보낸 회차는 건드리지 않는다.
+	 * 추첨일로부터 7일 안의 회차만 본다. 지난주 회차를 이번 주에 새 소식처럼 보내지 않기 위해서다.
+	 * 그런 회차는 최신 회차와 직전 회차뿐이므로 두 회차만 조회한다. 이미 보냈거나 텔레그램 설정이 없으면 건드리지 않는다.
+	 * 늦게 수집한 회차는 수집 경로의 {@link #process(int)}가 기간과 관계없이 채점하고 알린다.
 	 */
 	public void resendUnsent() {
+		if (!notifications.isEnabled()) {
+			return;
+		}
+		LocalDate today = LocalDate.now(clock);
 		rounds.findTopByOrderByRoundNoDesc().ifPresent(latest -> {
-			List<Integer> candidates = List.of(latest.getRoundNo() - 1, latest.getRoundNo());
-			for (int round : candidates) {
-				if (notifications.statusOf(NotificationKind.DRAW_FINISHED, String.valueOf(round))
-						== NotificationStatus.SENT) {
-					continue;
-				}
-				rounds.findById(round).ifPresent(this::process);
+			for (int round : List.of(latest.getRoundNo() - 1, latest.getRoundNo())) {
+				rounds.findById(round)
+					.filter(drawn -> withinNotifyWindow(drawn, today))
+					.filter(drawn -> notifications.statusOf(NotificationKind.DRAW_FINISHED, String.valueOf(round))
+							!= NotificationStatus.SENT)
+					.ifPresent(this::process);
 			}
 		});
+	}
+
+	private static boolean withinNotifyWindow(LottoRound round, LocalDate today) {
+		return ChronoUnit.DAYS.between(round.getDrawDate(), today) <= NOTIFY_WINDOW_DAYS;
 	}
 
 	private void process(LottoRound drawn) {
@@ -93,7 +105,7 @@ public class PostDrawService {
 		if (hasRecommendations) {
 			return true;
 		}
-		return ChronoUnit.DAYS.between(round.getDrawDate(), today) <= NOTIFY_WITHOUT_RECOMMENDATION_DAYS;
+		return withinNotifyWindow(round, today);
 	}
 
 	/** 아직 채점하지 않은 줄만 채점해 저장하고, 그 회차의 결과 전체를 돌려준다. */
