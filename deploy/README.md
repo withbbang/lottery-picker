@@ -141,6 +141,8 @@ gh secret set NAS_SSH_KEY < ~/.ssh/<배포용 개인키>
 
 `TOTP_SECRET`이 비어 있으면 api가 기동하지 않으므로, 워크플로는 `.env`의 `TOTP_SECRET`이 비어 있으면 **배포 전에 멈춘다**. 첫 실행은 이미지를 GHCR에 올리고 `deploy/`를 NAS에 복사한 뒤 여기서 멈추는 것이 정상이다.
 
+이 배포 구성을 `master`에 처음 푸시하는 순간에도 워크플로가 자동으로 한 번 돈다. 시크릿이나 `.env`가 아직 없으면 그 실행은 해당 확인 단계에서 실패하고 NAS는 건드리지 않으니 무시해도 된다.
+
 1. GitHub → Actions → **deploy** → Run workflow (브랜치 `master`). build 잡 2개가 성공하고, deploy 잡이 `TOTP_SECRET 이 비어 있습니다`로 실패한다.
 2. NAS에서 방금 올라간 api 이미지를 받아 일회성 시크릿 생성기(`com.lotterypicker.auth.TotpSetup`, Gradle의 `totpSetup` 태스크와 같은 클래스)를 실행한다. DB에는 접속하지 않는다.
    ```bash
@@ -243,7 +245,7 @@ DSM 제어판 → 로그인 포털 → 고급 → 역방향 프록시 → 생성
 - 휴대폰 **와이파이를 끄고** LTE/5G로 `https://lottery-picker.o-r.kr` 접속 → 자물쇠 표시, OTP 로그인 성공, 새로고침 후에도 로그인 유지.
   - 집 와이파이에서는 공유기가 NAT 루프백을 지원하지 않으면 도메인 접속이 안 될 수 있다. 바깥 망으로 확인한다.
 - 바깥 망에서 아래가 **열리지 않아야** 한다: `http://<공인 IP>:13000`, `:3306`, `:8080`, `:5000`, `:5001` (그리고 `NAS_SSH_PORT`가 22가 아니면 `:22`).
-- 바깥 망에서 SSH 포트는 열려 있되 **비밀번호 로그인은 거절돼야** 한다 (2-7의 5번):
+- 바깥 망에서 SSH 포트는 열려 있되 **비밀번호 로그인은 거절돼야** 한다 (2-7의 6번):
   ```bash
   ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password -p <NAS_SSH_PORT> <배포계정>@<NAS_HOST>
   # Permission denied (publickey) 류로 끝나면 된다. 비밀번호를 물으면 2-7의 5번을 본다.

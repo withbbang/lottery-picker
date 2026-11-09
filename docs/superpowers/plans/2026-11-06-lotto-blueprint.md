@@ -601,7 +601,7 @@ Expected: Flyway 적용, `ddl-auto: validate` 통과, 기동 성공. 확인 후 
 ### Task 9: 집 서버 배포
 
 **Files:**
-- Create: `apps/api/Dockerfile`, `apps/web/Dockerfile`, `deploy/compose.yml`, `deploy/backup.sh`, `deploy/README.md`, `deploy/.env.example`
+- Create: `apps/api/Dockerfile`, `apps/web/Dockerfile`, `deploy/compose.yml`, `deploy/backup.sh`, `deploy/README.md`, `deploy/.env.example`, `deploy/compose.build.yml`, `deploy/restore-check.sh`, `.github/workflows/deploy.yml` (2026-11-09 변경)
 
 **Interfaces:**
 - Consumes: 모든 앱 환경변수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `TOTP_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `API_INTERNAL_URL`
@@ -621,7 +621,7 @@ Expected: Flyway 적용, `ddl-auto: validate` 통과, 기동 성공. 확인 후 
 - 웹 이미지는 `API_INTERNAL_URL=http://api:8080`을 빌드 인자로 받는다.
 - 시크릿은 서버의 `deploy/.env`에 두고 Git에 넣지 않는다. 키 이름만 `deploy/.env.example`에 적고 `.gitignore`를 확인한다.
 
-Run: `docker compose -f deploy/compose.yml up --build` 후 `curl -s localhost:13000/api/v1/health`. Expected: `"status":"UP"`, `curl localhost:13000/api/v1/rounds`는 401, API 8080은 호스트에서 접속 불가.
+Run: `docker compose -f deploy/compose.yml -f deploy/compose.build.yml up --build` 후 `curl -s localhost:13000/api/v1/health`. Expected: `"status":"UP"`, `curl localhost:13000/api/v1/rounds`는 401, API 8080은 호스트에서 접속 불가.
 
 - [ ] **Step 4: 서버에 배포하고 OTP를 등록한다**
 

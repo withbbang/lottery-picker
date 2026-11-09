@@ -8,7 +8,7 @@
 # NAS 사전 준비 (chat-app 과 같은 배포 계정이면 2·3·5는 이미 되어 있다)
 #   1. DSM → 제어판 → 터미널 및 SNMP → SSH 활성화 (포트 변경 권장)
 #   2. 배포 계정 ~/.ssh/authorized_keys 에 공개키 등록
-#   3. docker login ghcr.io -u <GH_OWNER> -p <read:packages PAT>  (워크플로가 만든 패키지는 처음에 비공개)
+#   3. sudo docker login ghcr.io -u <GH_OWNER>  (비밀번호 프롬프트에 read:packages PAT 입력 — -p 는 셸 기록에 남음)  (워크플로가 만든 패키지는 처음에 비공개)
 #   4. <NAS_DEPLOY_DIR>/deploy/.env 준비 (deploy/.env.example 참고, TOTP_SECRET 포함)
 #   5. Synology 는 docker.sock 이 root:root 660 이라 sudo 필요(visudo 없음):
 #      sudo sh -c 'echo "<배포계정> ALL=(root) NOPASSWD: /usr/local/bin/docker" > /etc/sudoers.d/<배포계정> && chmod 440 /etc/sudoers.d/<배포계정>'
