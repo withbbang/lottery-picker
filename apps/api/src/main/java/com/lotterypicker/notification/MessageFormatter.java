@@ -32,11 +32,16 @@ public final class MessageFormatter {
 	 */
 	public static String recommendation(RecommendationSet set) {
 		String lines = set.lines().stream()
-			.filter(line -> line.strategy() != StrategyType.CONTROL)
+			.filter(line -> line.strategy() != StrategyType.CONTROL && line.strategy() != StrategyType.COMBINED)
 			.map(MessageFormatter::line)
+			.collect(Collectors.joining("\n"));
+		String combined = set.lines().stream()
+			.filter(line -> line.strategy() == StrategyType.COMBINED)
+			.map(line -> numbers(line.numbers()))
 			.collect(Collectors.joining("\n"));
 		return dateWithDay(set.date()) + " · " + set.round() + "회 추천\n\n"
 				+ "<pre>" + lines + "</pre>\n\n"
+				+ (combined.isEmpty() ? "" : "근거 조합\n<pre>" + combined + "</pre>\n\n")
 				+ RecommendationSetResponse.DISCLAIMER;
 	}
 
@@ -118,6 +123,7 @@ public final class MessageFormatter {
 			case PAIR -> "번호 쌍";
 			case BALANCED -> "균형";
 			case CONTROL -> "대조군";
+			case COMBINED -> "근거 조합";
 		};
 	}
 

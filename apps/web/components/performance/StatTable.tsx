@@ -74,6 +74,14 @@ export function RankBreakdown({
 }
 
 /** 모든 값이 같으면 그 값, 하나라도 다르면 null. 전략마다 같은 숫자는 표 밖에 한 번만 보여주려고 쓴다. */
+/** API는 enum 순서라 근거 조합이 대조군 뒤에 온다. 화면에서는 대조군을 맨 아래에 둔다. */
+export function controlLast<T extends { strategy: string }>(rows: T[]): T[] {
+  return [
+    ...rows.filter((r) => r.strategy !== "CONTROL"),
+    ...rows.filter((r) => r.strategy === "CONTROL"),
+  ];
+}
+
 export function sharedValue<T>(values: T[]): T | null {
   if (values.length === 0) {
     return null;

@@ -198,6 +198,55 @@ describe("RecommendationCard", () => {
     expect(screen.queryByText(/오후 5시에 나옵니다/)).toBeNull();
   });
 
+  it("shows combined lines on a separate slip", async () => {
+    // given
+    const combined = [
+      {
+        strategy: "COMBINED" as const,
+        numbers: [7, 12, 24, 37, 39, 40],
+        evidence: ["7(최근 빈도) · 12(장기 미출현) · 24·39(번호 쌍) · 37(전체 빈도) · 40(최근 빈도·전체 빈도)"],
+        relaxation: "NONE" as const,
+      },
+      {
+        strategy: "COMBINED" as const,
+        numbers: [7, 12, 24, 29, 37, 39],
+        evidence: ["7(최근 빈도) · 12(장기 미출현) · 24·39(번호 쌍) · 29(장기 미출현) · 37(전체 빈도)"],
+        relaxation: "NONE" as const,
+      },
+    ];
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { ...set, lines: [...set.lines, ...combined] },
+        }),
+      ),
+    );
+
+    // when
+    renderCard();
+
+    // then
+    const slip = await screen.findByRole("region", { name: "근거 조합" });
+    expect(within(slip).getAllByRole("article")).toHaveLength(2);
+    expect(within(slip).getByText("40")).toBeInTheDocument();
+    expect(screen.getAllByRole("article")).toHaveLength(7);
+  });
+
+  it("hides the combined slip when there are no combined lines", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: set })),
+    );
+
+    // when
+    renderCard();
+
+    // then
+    await screen.findAllByRole("article");
+    expect(screen.queryByRole("region", { name: "근거 조합" })).toBeNull();
+  });
+
   it("shows each strategy's description next to its name", async () => {
     // given
     fetchMock.mockResolvedValue(

@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/** 전략 5줄과 대조군 5줄을 만든다. 추천 줄은 제약을 못 지키면 겹침, 인기 조합 순으로 완화한다. */
+/** 전략 5줄, 그 근거로 만든 근거 조합(최대 5줄), 대조군 5줄을 만든다. 추천 줄은 제약을 못 지키면 겹침, 인기 조합 순으로 완화한다. */
 @Component
 public class RecommendationEngine {
 
@@ -36,11 +36,14 @@ public class RecommendationEngine {
 			lines.add(generateLine(strategy, stats, c, random, winners, lines));
 		}
 
+		List<DrawnLine> combined = CombinedLines.combine(lines.stream().map(GeneratedLine::line).toList(), c.fixed(),
+				numbers -> PopularityFilter.isPopular(numbers, winners));
+
 		List<DrawnLine> controlLines = new ArrayList<>();
 		for (int i = 0; i < CONTROL_LINES; i++) {
 			controlLines.add(control.draw(stats, c, random));
 		}
-		return new GeneratedSet(List.copyOf(lines), List.copyOf(controlLines));
+		return new GeneratedSet(List.copyOf(lines), combined, List.copyOf(controlLines));
 	}
 
 	private static GeneratedLine generateLine(LineStrategy strategy, NumberStatistics stats,
@@ -72,7 +75,7 @@ public class RecommendationEngine {
 	private static DrawnLine withNote(DrawnLine line, String note) {
 		List<String> evidence = new ArrayList<>(line.evidence());
 		evidence.add(note);
-		return new DrawnLine(line.strategy(), line.numbers(), List.copyOf(evidence));
+		return new DrawnLine(line.strategy(), line.numbers(), List.copyOf(evidence), line.ingredients());
 	}
 
 }

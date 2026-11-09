@@ -238,6 +238,46 @@ class RecommendationEngineTest {
 	}
 
 	@Test
+	void 근거_조합은_최종_다섯_줄의_재료로_만든다() {
+		// when
+		GeneratedSet set = engine.generate(HISTORY, RecommendationConstraint.NONE, new Random(31));
+
+		// then
+		Set<Integer> ingredients = set.lines().stream()
+			.flatMap(line -> line.line().ingredients().stream())
+			.flatMap(ingredient -> ingredient.numbers().stream())
+			.collect(Collectors.toSet());
+		assertThat(set.combined()).isNotEmpty().hasSizeLessThanOrEqualTo(CombinedLines.MAX_LINES)
+			.allSatisfy(line -> {
+				assertThat(line.strategy()).isEqualTo(StrategyType.COMBINED);
+				assertThat(ingredients).containsAll(line.numbers().values());
+			});
+	}
+
+	@Test
+	void 근거_조합에는_인기_조합이_없다() {
+		// when
+		GeneratedSet set = engine.generate(HISTORY, RecommendationConstraint.NONE, new Random(32));
+
+		// then
+		Set<LottoNumbers> winners = HISTORY.draws().stream().map(HistoricalDraw::numbers).collect(Collectors.toSet());
+		assertThat(set.combined()).noneMatch(line -> PopularityFilter.isPopular(line.numbers(), winners));
+	}
+
+	@Test
+	void 완화된_줄도_재료를_잃지_않는다() {
+		// given: 후보가 정확히 6개라 모든 줄이 완화된다
+		RecommendationConstraint c = RecommendationConstraint.of(Set.of(), allExcept(3, 12, 20, 29, 34, 39));
+
+		// when
+		GeneratedSet set = engine.generate(evidenceHistory(), c, new Random(14));
+
+		// then
+		assertThat(set.lines().get(1).relaxation()).isNotEqualTo(Relaxation.NONE);
+		assertThat(set.lines().get(1).line().ingredients()).isNotEmpty();
+	}
+
+	@Test
 	void 근거_문구_형식이_맞다() {
 		// given: 후보 6개를 고정해 근거 수치를 정확히 맞춘 1248회 합성 데이터
 		Integer[] kept = { 3, 12, 20, 29, 34, 39 };

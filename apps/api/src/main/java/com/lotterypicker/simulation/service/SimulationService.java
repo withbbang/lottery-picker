@@ -5,8 +5,10 @@ import com.lotterypicker.lotto.LottoNumbers;
 import com.lotterypicker.lotto.PrizeRank;
 import com.lotterypicker.recommendation.engine.AllTimeStrategy;
 import com.lotterypicker.recommendation.engine.BalancedStrategy;
+import com.lotterypicker.recommendation.engine.CombinedLines;
 import com.lotterypicker.recommendation.engine.ControlStrategy;
 import com.lotterypicker.recommendation.engine.DrawHistory;
+import com.lotterypicker.recommendation.engine.DrawnLine;
 import com.lotterypicker.recommendation.engine.HistoricalDraw;
 import com.lotterypicker.recommendation.engine.LineStrategy;
 import com.lotterypicker.recommendation.engine.LongColdStrategy;
@@ -33,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -58,18 +61,25 @@ public class SimulationService {
 
 	public static final int REPETITIONS = 200;
 
-	/** 신뢰구간 계산 방식 버전. 1: 줄 단위 이항 근사, 2: 회차 단위(군집) 분산. 바꾸면 저장된 결과를 다시 계산한다. */
-	public static final int METHOD_VERSION = 2;
+	/**
+	 * 계산 방식 버전. 1: 줄 단위 이항 근사, 2: 회차 단위(군집) 분산, 3: 근거 조합 전략 추가. 바꾸면 저장된 결과를 다시
+	 * 계산한다.
+	 */
+	public static final int METHOD_VERSION = 3;
 
 	public static final long BASE_SEED = 20_261_106L;
 
-	public static final String SCOPE_NOTE = "실제 추천에서 거르는 고정·제외 번호, 많은 사람이 고르는 조합, 다른 줄과 겹치는 번호는 적용하지 않고 전략이 번호를 고르는 방식만 시험했습니다.";
+	public static final String SCOPE_NOTE = "실제 추천에서 거르는 고정·제외 번호, 많은 사람이 고르는 조합, 다른 줄과 겹치는 번호는 적용하지 않고 전략이 번호를 고르는 방식만 시험했습니다. 근거 조합도 같은 조건에서 다섯 전략 줄의 근거로 만들었습니다.";
 
 	private static final Map<StrategyType, LineStrategy> STRATEGIES = Stream
 		.of(new RecentHotStrategy(), new LongColdStrategy(), new AllTimeStrategy(), new PairStrategy(),
 				new BalancedStrategy(), new ControlStrategy())
 		.collect(Collectors.toMap(LineStrategy::type, Function.identity(), (a, b) -> a,
 				() -> new EnumMap<>(StrategyType.class)));
+
+	/** 근거 조합의 재료가 되는 다섯 전략. 실제 추천과 같은 순서. */
+	private static final List<StrategyType> COMBINED_SOURCES = List.of(StrategyType.RECENT_HOT,
+			StrategyType.LONG_COLD, StrategyType.ALL_TIME, StrategyType.PAIR, StrategyType.BALANCED);
 
 	private final LottoRoundRepository rounds;
 	private final SimulationResultRepository results;
@@ -151,9 +161,15 @@ public class SimulationService {
 		}
 		for (HistoricalDraw target : targets) {
 			NumberStatistics stats = NumberStatistics.from(history.before(target.round()));
+			Map<StrategyType, List<DrawnLine>> drawn = new EnumMap<>(StrategyType.class);
+			for (StrategyType type : STRATEGIES.keySet()) {
+				drawn.put(type, draw(stats, target.round(), type, repetitions, baseSeed));
+			}
 			for (StrategyType type : StrategyType.values()) {
+				List<LottoNumbers> lines = type == StrategyType.COMBINED ? combined(drawn, repetitions)
+						: drawn.get(type).stream().map(DrawnLine::numbers).toList();
 				Tally tally = tallies.get(type);
-				for (LottoNumbers line : draw(stats, target.round(), type, repetitions, baseSeed)) {
+				for (LottoNumbers line : lines) {
 					tally.add(line.countMatches(target.numbers()), PrizeRank.of(line, target.numbers(), target.bonus()));
 				}
 				tally.endRound();
@@ -169,10 +185,36 @@ public class SimulationService {
 				strategies);
 	}
 
-	/** 회차 {@code round}에서 전략이 뽑는 줄. 그 회차 이전 데이터만 본다. */
+	/** 회차 {@code round}에서 전략이 뽑는 줄. 그 회차 이전 데이터만 본다. 근거 조합은 반복마다 0~5줄이다. */
 	static List<LottoNumbers> linesFor(DrawHistory history, int round, StrategyType type, int repetitions,
 			long baseSeed) {
+		NumberStatistics stats = NumberStatistics.from(history.before(round));
+		if (type == StrategyType.COMBINED) {
+			Map<StrategyType, List<DrawnLine>> drawn = new EnumMap<>(StrategyType.class);
+			for (StrategyType source : COMBINED_SOURCES) {
+				drawn.put(source, draw(stats, round, source, repetitions, baseSeed));
+			}
+			return combined(drawn, repetitions);
+		}
+		return draw(stats, round, type, repetitions, baseSeed).stream().map(DrawnLine::numbers).toList();
+	}
+
+	/** 근거 조합을 제외한 전략이 뽑는 줄(근거와 재료 포함). */
+	static List<DrawnLine> drawnFor(DrawHistory history, int round, StrategyType type, int repetitions,
+			long baseSeed) {
 		return draw(NumberStatistics.from(history.before(round)), round, type, repetitions, baseSeed);
+	}
+
+	/** 반복 i마다 다섯 전략의 i번째 줄을 재료로 근거 조합을 만든다. 실제 추천과 달리 인기 조합도 거르지 않는다. */
+	private static List<LottoNumbers> combined(Map<StrategyType, List<DrawnLine>> drawn, int repetitions) {
+		List<LottoNumbers> lines = new ArrayList<>();
+		for (int i = 0; i < repetitions; i++) {
+			int rep = i;
+			List<DrawnLine> sources = COMBINED_SOURCES.stream().map(type -> drawn.get(type).get(rep)).toList();
+			CombinedLines.combine(sources, Set.of(), numbers -> false)
+				.forEach(line -> lines.add(line.numbers()));
+		}
+		return lines;
 	}
 
 	static long seedFor(long baseSeed, int round, StrategyType type) {
@@ -190,13 +232,13 @@ public class SimulationService {
 		return z ^ (z >>> 31);
 	}
 
-	private static List<LottoNumbers> draw(NumberStatistics stats, int round, StrategyType type, int repetitions,
+	private static List<DrawnLine> draw(NumberStatistics stats, int round, StrategyType type, int repetitions,
 			long baseSeed) {
 		LineStrategy strategy = STRATEGIES.get(type);
 		Random random = new Random(mixedSeedFor(baseSeed, round, type));
-		List<LottoNumbers> lines = new ArrayList<>(repetitions);
+		List<DrawnLine> lines = new ArrayList<>(repetitions);
 		for (int i = 0; i < repetitions; i++) {
-			lines.add(strategy.draw(stats, RecommendationConstraint.NONE, random).numbers());
+			lines.add(strategy.draw(stats, RecommendationConstraint.NONE, random));
 		}
 		return lines;
 	}
@@ -242,8 +284,10 @@ public class SimulationService {
 		StrategySimulation summarize(StrategyType type, ConfidenceInterval control) {
 			ConfidenceInterval interval = interval();
 			boolean differs = type != StrategyType.CONTROL && interval.differsFrom(control);
-			return new StrategySimulation(type, lines, (double) matches / lines, rankCounts,
-					(double) hits / lines, interval.low(), interval.high(), differs);
+			// 근거 조합은 재료가 모자라면 줄이 없을 수 있다.
+			double perLine = lines == 0 ? 0 : 1.0 / lines;
+			return new StrategySimulation(type, lines, matches * perLine, rankCounts, hits * perLine, interval.low(),
+					interval.high(), differs);
 		}
 
 	}

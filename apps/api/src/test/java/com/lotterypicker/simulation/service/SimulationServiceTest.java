@@ -10,7 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.lotterypicker.lotto.LottoNumbers;
 import com.lotterypicker.lotto.PrizeRank;
+import com.lotterypicker.recommendation.engine.CombinedLines;
 import com.lotterypicker.recommendation.engine.DrawHistory;
+import com.lotterypicker.recommendation.engine.DrawnLine;
 import com.lotterypicker.recommendation.engine.HistoricalDraw;
 import com.lotterypicker.recommendation.engine.PopularityFilter;
 import com.lotterypicker.recommendation.engine.StrategyType;
@@ -45,6 +47,13 @@ class SimulationServiceTest {
 
 	private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 	private static final long SEED = 42L;
+	/** 근거 조합의 재료가 되는 다섯 전략. */
+	private static final List<StrategyType> SOURCE_STRATEGIES = List.of(StrategyType.RECENT_HOT,
+			StrategyType.LONG_COLD, StrategyType.ALL_TIME, StrategyType.PAIR, StrategyType.BALANCED);
+	/** 반복마다 정확히 한 줄을 뽑는 전략(근거 조합 제외). */
+	private static final List<StrategyType> LINE_STRATEGIES = List.of(StrategyType.RECENT_HOT,
+			StrategyType.LONG_COLD, StrategyType.ALL_TIME, StrategyType.PAIR, StrategyType.BALANCED,
+			StrategyType.CONTROL);
 
 	private final LottoRoundRepository rounds = mock(LottoRoundRepository.class);
 	private final SimulationResultRepository results = mock(SimulationResultRepository.class);
@@ -135,6 +144,7 @@ class SimulationServiceTest {
 		assertThat(saved.getFromRound()).isEqualTo(101);
 		assertThat(saved.getToRound()).isEqualTo(103);
 		assertThat(saved.getStrategies())
+			.filteredOn(s -> s.strategy() != StrategyType.COMBINED)
 			.allSatisfy(s -> assertThat(s.lineCount()).isEqualTo(3L * SimulationService.REPETITIONS));
 	}
 
@@ -150,7 +160,7 @@ class SimulationServiceTest {
 		assertThat(report.repetitions()).isEqualTo(200);
 		assertThat(report.strategies()).extracting(StrategySimulation::strategy)
 			.containsExactly(StrategyType.values());
-		assertThat(report.strategies()).allSatisfy(s -> {
+		assertThat(report.strategies()).filteredOn(s -> s.strategy() != StrategyType.COMBINED).allSatisfy(s -> {
 			assertThat(s.lineCount()).isEqualTo(600);
 			assertThat(s.rankCounts().values().stream().mapToLong(Long::longValue).sum()).isEqualTo(600);
 		});
@@ -214,7 +224,7 @@ class SimulationServiceTest {
 			.map(HistoricalDraw::numbers)
 			.collect(Collectors.toSet());
 
-		for (StrategyType strategy : StrategyType.values()) {
+		for (StrategyType strategy : LINE_STRATEGIES) {
 			// when
 			List<LottoNumbers> lines = SimulationService.linesFor(history, 101, strategy, 200, SEED);
 
@@ -222,6 +232,63 @@ class SimulationServiceTest {
 			assertThat(lines).as(strategy.name()).hasSize(200);
 			assertThat(lines).as(strategy.name()).anyMatch(line -> PopularityFilter.isPopular(line, winners));
 		}
+	}
+
+	@Test
+	void 근거_조합_결과가_있다() {
+		// when
+		SimulationReport report = service.run(history(SEED, 103), 101, 3, SEED);
+
+		// then
+		StrategySimulation combined = report.strategies().stream()
+			.filter(s -> s.strategy() == StrategyType.COMBINED)
+			.findFirst()
+			.orElseThrow();
+		assertThat(combined.lineCount()).isPositive();
+		assertThat(combined.rankCounts().values().stream().mapToLong(Long::longValue).sum())
+			.isEqualTo(combined.lineCount());
+	}
+
+	@Test
+	void 근거_조합은_소스_전략의_같은_반복_줄로_만든다() {
+		// given
+		DrawHistory history = history(SEED, 105);
+		List<List<DrawnLine>> sources = SOURCE_STRATEGIES.stream()
+			.map(type -> SimulationService.drawnFor(history, 105, type, 4, SEED))
+			.toList();
+
+		// when
+		List<LottoNumbers> lines = SimulationService.linesFor(history, 105, StrategyType.COMBINED, 4, SEED);
+
+		// then
+		List<LottoNumbers> expected = new ArrayList<>();
+		for (int i = 0; i < 4; i++) {
+			int rep = i;
+			List<DrawnLine> sameRep = sources.stream().map(list -> list.get(rep)).toList();
+			CombinedLines.combine(sameRep, Set.of(), n -> false).forEach(line -> expected.add(line.numbers()));
+		}
+		assertThat(lines).isNotEmpty().isEqualTo(expected);
+	}
+
+	@Test
+	void 근거_조합도_그_회차_이전_데이터만_쓴다() {
+		// given
+		DrawHistory original = history(SEED, 110);
+		DrawHistory changedFuture = withRoundsAfter(original, 104, 7L);
+
+		// when
+		List<LottoNumbers> before = SimulationService.linesFor(original, 105, StrategyType.COMBINED, 20, SEED);
+		List<LottoNumbers> after = SimulationService.linesFor(changedFuture, 105, StrategyType.COMBINED, 20, SEED);
+
+		// then
+		assertThat(after).isEqualTo(before);
+	}
+
+	@Test
+	void 기존_전략의_순번은_바뀌지_않는다() {
+		// then: 시드가 ordinal을 쓰므로 새 전략은 맨 뒤에만 붙는다
+		assertThat(StrategyType.values()).startsWith(StrategyType.RECENT_HOT, StrategyType.LONG_COLD,
+				StrategyType.ALL_TIME, StrategyType.PAIR, StrategyType.BALANCED, StrategyType.CONTROL);
 	}
 
 	@Test
@@ -304,7 +371,7 @@ class SimulationServiceTest {
 
 		// then
 		SimulationResult saved = savedResult();
-		assertThat(SimulationService.METHOD_VERSION).isEqualTo(2);
+		assertThat(SimulationService.METHOD_VERSION).isEqualTo(3);
 		assertThat(saved.getMethodVersion()).isEqualTo(SimulationService.METHOD_VERSION);
 		assertThat(saved.getToRound()).isEqualTo(103);
 	}
@@ -374,7 +441,7 @@ class SimulationServiceTest {
 		assertThat(response.computedAt().toString()).isEqualTo("2026-11-09T10:00+09:00");
 		assertThat(response.theoryAtLeastFifthRate()).isEqualTo(194_130d / 8_145_060d);
 		assertThat(response.scopeNote())
-			.isEqualTo("실제 추천에서 거르는 고정·제외 번호, 많은 사람이 고르는 조합, 다른 줄과 겹치는 번호는 적용하지 않고 전략이 번호를 고르는 방식만 시험했습니다.");
+			.isEqualTo("실제 추천에서 거르는 고정·제외 번호, 많은 사람이 고르는 조합, 다른 줄과 겹치는 번호는 적용하지 않고 전략이 번호를 고르는 방식만 시험했습니다. 근거 조합도 같은 조건에서 다섯 전략 줄의 근거로 만들었습니다.");
 		assertThat(response.strategies()).hasSize(StrategyType.values().length);
 	}
 

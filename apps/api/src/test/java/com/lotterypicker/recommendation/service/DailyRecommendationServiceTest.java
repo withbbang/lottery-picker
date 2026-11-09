@@ -23,6 +23,7 @@ import com.lotterypicker.recommendation.engine.DrawHistory;
 import com.lotterypicker.recommendation.engine.HistoricalDraw;
 import com.lotterypicker.recommendation.engine.RecommendationConstraint;
 import com.lotterypicker.recommendation.engine.RecommendationEngine;
+import com.lotterypicker.recommendation.engine.Relaxation;
 import com.lotterypicker.recommendation.engine.StrategyType;
 import com.lotterypicker.recommendation.entity.DailyRecommendation;
 import com.lotterypicker.recommendation.repository.DailyRecommendationRepository;
@@ -129,12 +130,12 @@ class DailyRecommendationServiceTest {
 		// when
 		Optional<RecommendationSet> result = service.generateIfAbsent(DATE);
 
-		// then
-		assertThat(db).hasSize(10);
+		// then: 근거 조합 줄은 따로 센다
+		assertThat(db).filteredOn(line -> line.getStrategy() != StrategyType.COMBINED).hasSize(10);
 		assertThat(db).filteredOn(DailyRecommendation::isControl)
 			.hasSize(5)
 			.allMatch(line -> line.getStrategy() == StrategyType.CONTROL);
-		assertThat(db.stream().filter(line -> !line.isControl())
+		assertThat(db.stream().filter(line -> !line.isControl() && line.getStrategy() != StrategyType.COMBINED)
 			.sorted(Comparator.comparingInt(DailyRecommendation::getLineIndex))
 			.map(DailyRecommendation::getStrategy)
 			.toList())
@@ -144,9 +145,29 @@ class DailyRecommendationServiceTest {
 		assertThat(result).isPresent();
 		assertThat(result.get().date()).isEqualTo(DATE);
 		assertThat(result.get().round()).isEqualTo(1249);
-		assertThat(result.get().lines()).hasSize(5)
+		assertThat(result.get().lines()).filteredOn(line -> line.strategy() != StrategyType.COMBINED)
+			.hasSize(5)
 			.extracting(StoredLine::strategy)
 			.doesNotContain(StrategyType.CONTROL);
+	}
+
+	@Test
+	void 근거_조합_줄은_line_index_5부터_저장한다() {
+		// when
+		Optional<RecommendationSet> result = service.generateIfAbsent(DATE);
+
+		// then
+		List<DailyRecommendation> combined = db.stream()
+			.filter(line -> line.getStrategy() == StrategyType.COMBINED)
+			.sorted(Comparator.comparingInt(DailyRecommendation::getLineIndex))
+			.toList();
+		assertThat(combined).isNotEmpty()
+			.allSatisfy(line -> assertThat(line.isControl()).isFalse())
+			.allSatisfy(line -> assertThat(line.getRelaxation()).isEqualTo(Relaxation.NONE));
+		assertThat(combined).extracting(DailyRecommendation::getLineIndex)
+			.isEqualTo(IntStream.range(5, 5 + combined.size()).boxed().toList());
+		assertThat(result.orElseThrow().lines()).filteredOn(line -> line.strategy() == StrategyType.COMBINED)
+			.hasSize(combined.size());
 	}
 
 	@Test
@@ -154,12 +175,14 @@ class DailyRecommendationServiceTest {
 		// given
 		service.generateIfAbsent(DATE);
 
+		int firstSize = db.size();
+
 		// when
 		Optional<RecommendationSet> second = service.generateIfAbsent(DATE);
 
 		// then
 		assertThat(second).isEmpty();
-		assertThat(db).hasSize(10);
+		assertThat(db).hasSize(firstSize);
 	}
 
 	@Test
@@ -240,7 +263,8 @@ class DailyRecommendationServiceTest {
 		service.generateIfAbsent(DATE);
 
 		// then
-		assertThat(db).hasSize(10).allSatisfy(line -> {
+		assertThat(db).filteredOn(line -> line.getStrategy() != StrategyType.COMBINED).hasSize(10);
+		assertThat(db).allSatisfy(line -> {
 			assertThat(line.getFixedSnapshot()).isEqualTo("3,7");
 			assertThat(line.getExcludedSnapshot()).isEqualTo("1,45");
 			assertThat(line.getHistoryFromRound()).isEqualTo(LATEST_ROUND - ROUNDS + 1);
@@ -292,7 +316,7 @@ class DailyRecommendationServiceTest {
 		var stored = service.find(DATE).orElseThrow();
 		assertThat(db.stream().map(line -> line.numbers().values()).toList()).isEqualTo(before);
 		assertThat(db).noneMatch(DailyRecommendation::hasSettings);
-		assertThat(stored.lines()).hasSize(5);
+		assertThat(stored.lines()).filteredOn(line -> line.strategy() != StrategyType.COMBINED).hasSize(5);
 	}
 
 	@Test
@@ -356,7 +380,7 @@ class DailyRecommendationServiceTest {
 		var found = service.find(DATE).orElseThrow();
 
 		// then
-		assertThat(found.lines()).hasSize(5);
+		assertThat(found.lines()).filteredOn(line -> line.strategy() != StrategyType.COMBINED).hasSize(5);
 		assertThat(found.lines()).noneMatch(line -> line.strategy() == StrategyType.CONTROL);
 		assertThat(found.round()).isEqualTo(1249);
 	}

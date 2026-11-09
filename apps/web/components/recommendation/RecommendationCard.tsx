@@ -17,6 +17,7 @@ export const STRATEGY_LABELS: Record<StrategyType, string> = {
   ALL_TIME: "전체 빈도",
   PAIR: "번호 쌍",
   BALANCED: "균형",
+  COMBINED: "근거 조합",
 };
 
 /** 전략이 번호를 고르는 방식. 백엔드 recommendation/engine 의 각 전략 구현을 한 줄로 옮긴 것. */
@@ -26,6 +27,7 @@ export const STRATEGY_DESCRIPTIONS: Record<StrategyType, string> = {
   ALL_TIME: "역대 자주 나온 번호 위주",
   PAIR: "함께 자주 나온 번호끼리",
   BALANCED: "홀짝·합계가 고른 조합",
+  COMBINED: "각 전략 근거 번호를 모은 조합",
 };
 
 /** "2026-11-05" → "11월 5일". 날짜 계산 없이 문자열만 나눈다. */
@@ -46,6 +48,8 @@ async function fetchTodayRecommendation(): Promise<RecommendationSetResponse | n
   );
   return set ?? null;
 }
+
+type Line = RecommendationSetResponse["lines"][number];
 
 export function RecommendationCard() {
   const { data, isPending, isError } = useQuery({
@@ -70,6 +74,9 @@ export function RecommendationCard() {
       </p>
     );
   }
+
+  const strategyLines = data.lines.filter((l) => l.strategy !== "COMBINED");
+  const combinedLines = data.lines.filter((l) => l.strategy === "COMBINED");
 
   return (
     <div className="flex flex-col gap-4">
@@ -99,14 +106,15 @@ export function RecommendationCard() {
           <span className="text-lg font-bold">{data.round}회</span>
           <span className="text-sm font-medium">{data.date}</span>
         </p>
-        {data.lines.map((line, index) => (
+        {strategyLines.map((line, index) => (
           <SlipLine
-            key={line.strategy}
+            key={`${line.strategy}-${index}`}
             letter={gameLetter(index)}
             line={line}
           />
         ))}
       </div>
+      {combinedLines.length > 0 && <CombinedSlip lines={combinedLines} />}
       <div className="flex flex-col gap-1 text-sm">
         <p className="text-muted tabular-nums">
           분석 범위: {data.historyFromRound}~{data.historyToRound}회
@@ -117,12 +125,42 @@ export function RecommendationCard() {
   );
 }
 
+/** 근거 조합은 용지 한 장을 따로 쓴다. 설명은 머리에 한 번만 둔다. */
+function CombinedSlip({ lines }: { lines: Line[] }) {
+  const titleId = useId();
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="overflow-hidden rounded-lg border-2 border-slip bg-surface"
+    >
+      <p className="flex flex-wrap items-baseline justify-between gap-x-3 bg-slip-soft px-4 py-2.5 text-slip">
+        <span id={titleId} className="text-lg font-bold">
+          {STRATEGY_LABELS.COMBINED}
+        </span>
+        <span className="text-sm font-medium">
+          {STRATEGY_DESCRIPTIONS.COMBINED}
+        </span>
+      </p>
+      {lines.map((line, index) => (
+        <SlipLine
+          key={`${line.strategy}-${index}`}
+          letter={gameLetter(index)}
+          line={line}
+          showDescription={false}
+        />
+      ))}
+    </section>
+  );
+}
+
 function SlipLine({
   letter,
   line,
+  showDescription = true,
 }: {
   letter: string;
-  line: RecommendationSetResponse["lines"][number];
+  line: Line;
+  showDescription?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const evidenceId = useId();
@@ -139,9 +177,11 @@ function SlipLine({
         <span className="text-sm font-semibold">
           {STRATEGY_LABELS[line.strategy]}
         </span>{" "}
-        <span className="text-xs text-muted">
-          {STRATEGY_DESCRIPTIONS[line.strategy]}
-        </span>
+        {showDescription && (
+          <span className="text-xs text-muted">
+            {STRATEGY_DESCRIPTIONS[line.strategy]}
+          </span>
+        )}
       </h2>
       <button
         type="button"

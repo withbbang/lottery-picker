@@ -76,6 +76,33 @@ class MessageFormatterTest {
 		assertThat(text).doesNotContain(" 6 · 11 · 19 · 27 · 38 · 44", "대조군");
 	}
 
+	@Test
+	void 근거_조합은_별도_블록이다() {
+		// given
+		List<StoredLine> lines = fiveLines();
+		lines.add(new StoredLine(StrategyType.COMBINED, new LottoNumbers(List.of(7, 12, 21, 30, 33, 42)),
+				List.of("근거"), Relaxation.NONE));
+
+		// when
+		String text = MessageFormatter.recommendation(new RecommendationSet(DATE, 1249, lines));
+
+		// then
+		assertThat(text).contains("""
+				 5 · 11 · 19 · 27 · 38 · 44  균형</pre>
+
+				근거 조합
+				<pre> 7 · 12 · 21 · 30 · 33 · 42</pre>""");
+	}
+
+	@Test
+	void 근거_조합이_없으면_블록을_넣지_않는다() {
+		// when
+		String text = MessageFormatter.recommendation(new RecommendationSet(DATE, 1249, fiveLines()));
+
+		// then
+		assertThat(text).doesNotContain("근거 조합");
+	}
+
 	private static DrawSummary summary(LocalDateTime lateCollectedAt, ResultTally tally) {
 		return new DrawSummary(1249, LocalDate.of(2026, 11, 7), new LottoNumbers(List.of(3, 11, 19, 27, 38, 44)), 7,
 				lateCollectedAt, tally);

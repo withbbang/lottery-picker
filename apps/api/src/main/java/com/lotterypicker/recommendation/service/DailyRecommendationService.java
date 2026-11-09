@@ -95,10 +95,12 @@ public class DailyRecommendationService {
 			}
 			throw e;
 		}
-		return Optional.of(new RecommendationSet(date, round, generated.lines().stream()
-			.map(line -> new StoredLine(line.line().strategy(), line.line().numbers(), line.line().evidence(),
-					line.relaxation()))
-			.toList()));
+		List<StoredLine> saved = new ArrayList<>();
+		generated.lines().forEach(line -> saved.add(new StoredLine(line.line().strategy(), line.line().numbers(),
+				line.line().evidence(), line.relaxation())));
+		generated.combined().forEach(line -> saved.add(new StoredLine(line.strategy(), line.numbers(),
+				line.evidence(), Relaxation.NONE)));
+		return Optional.of(new RecommendationSet(date, round, List.copyOf(saved)));
 	}
 
 	/** 화면용 조회. 대조군은 성적표에만 쓰므로 뺀다. */
@@ -173,6 +175,11 @@ public class DailyRecommendationService {
 		List<GeneratedLine> lines = generated.lines();
 		for (int i = 0; i < lines.size(); i++) {
 			rows.add(row(base, lines.get(i).line(), i, lines.get(i).relaxation()));
+		}
+		// 근거 조합은 전략 5줄 뒤 순번(5~)을 쓴다. 날짜 단위로 line_index 정렬할 때 두 묶음이 섞이지 않는다.
+		List<DrawnLine> combined = generated.combined();
+		for (int i = 0; i < combined.size(); i++) {
+			rows.add(row(base, combined.get(i), lines.size() + i, Relaxation.NONE));
 		}
 		List<DrawnLine> control = generated.control();
 		for (int i = 0; i < control.size(); i++) {

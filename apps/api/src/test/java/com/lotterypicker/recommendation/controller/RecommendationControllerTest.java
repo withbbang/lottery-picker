@@ -290,6 +290,23 @@ class RecommendationControllerTest {
 	}
 
 	@Test
+	void 근거_조합_줄을_응답에_담는다() throws Exception {
+		// given
+		List<DailyRecommendation> lines = storedSet(TODAY);
+		lines.add(line(TODAY, StrategyType.COMBINED, 5));
+		lines.add(line(TODAY, StrategyType.COMBINED, 6));
+		given(repository.findByDateOrderByLineIndexAsc(TODAY)).willReturn(lines);
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations").param("date", "2026-11-06"));
+
+		// then
+		result.andExpect(jsonPath("$.data.lines", hasSize(7)))
+			.andExpect(jsonPath("$.data.lines[5].strategy").value("COMBINED"))
+			.andExpect(jsonPath("$.data.lines[6].strategy").value("COMBINED"));
+	}
+
+	@Test
 	void 고지_문구를_포함한다() throws Exception {
 		// given
 		given(repository.findByDateOrderByLineIndexAsc(TODAY)).willReturn(storedSet(TODAY));

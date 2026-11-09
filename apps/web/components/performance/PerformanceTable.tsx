@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { STRATEGY_LABELS } from "@/components/recommendation/RecommendationCard";
 import {
+  controlLast,
   FifthOrBetter,
   HEAD_CELL,
   Legend,
@@ -107,7 +108,7 @@ export function PerformanceTable() {
               </th>
             </tr>
           </thead>
-          {data.strategies.map((s) => {
+          {controlLast(data.strategies).map((s) => {
             const empty = s.lineCount === 0;
             return (
               <tbody key={s.strategy} className="border-t border-rule">

@@ -199,4 +199,24 @@ describe("SimulationPanel", () => {
     expect(screen.getByText("2.31~2.49%")).toBeInTheDocument();
     expect(screen.queryByText("5등↑ 95% 구간")).not.toBeInTheDocument();
   });
+
+  it("lists the combined strategy above the control group", async () => {
+    // when: API는 enum 순서라 대조군 뒤에 근거 조합을 준다
+    renderPanel([
+      row({}),
+      row({ strategy: "CONTROL" }),
+      row({ strategy: "COMBINED" }),
+    ]);
+
+    // then
+    await screen.findByText("근거 조합");
+    const names = screen
+      .getAllByRole("row")
+      .map((r) => r.textContent ?? "")
+      .filter((t) => /최근 빈도|근거 조합|무작위 대조군/.test(t));
+    expect(names.findIndex((t) => t.includes("근거 조합"))).toBeLessThan(
+      names.findIndex((t) => t.includes("무작위 대조군")),
+    );
+    expect(names[names.length - 1]).toContain("무작위 대조군");
+  });
 });

@@ -30,11 +30,26 @@ final class WeightedSampler {
 
 		/** 가중치가 높았던 번호 최대 2개의 근거. 가중치가 기본값 1인 번호는 수치가 0이라 쓰지 않는다. */
 		List<String> evidence(IntFunction<String> text) {
+			return topPicks().stream()
+				.map(pick -> "번호 " + pick.number() + ": " + text.apply(pick.weight() - 1))
+				.toList();
+		}
+
+		/** {@link #evidence}에 적히는 번호와 같은 번호를 같은 순서로. */
+		List<Ingredient> ingredients() {
+			List<Pick> top = topPicks();
+			List<Ingredient> result = new ArrayList<>();
+			for (int i = 0; i < top.size(); i++) {
+				result.add(new Ingredient(List.of(top.get(i).number()), i));
+			}
+			return List.copyOf(result);
+		}
+
+		private List<Pick> topPicks() {
 			return picks.stream()
 				.sorted(Comparator.comparingInt(Pick::weight).reversed())
 				.limit(MAX_EVIDENCE)
 				.filter(pick -> pick.weight() > 1)
-				.map(pick -> "번호 " + pick.number() + ": " + text.apply(pick.weight() - 1))
 				.toList();
 		}
 

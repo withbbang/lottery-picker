@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { PERFORMANCE_LABELS } from "@/components/performance/PerformanceTable";
 import {
+  controlLast,
   FifthOrBetter,
   HEAD_CELL,
   Legend,
@@ -128,7 +129,7 @@ export function SimulationPanel() {
               </th>
             </tr>
           </thead>
-          {data.strategies.map((s) => (
+          {controlLast(data.strategies).map((s) => (
             <tbody key={s.strategy} className="border-t border-rule">
               <tr>
                 <th scope="row" className={NAME_CELL}>

@@ -105,6 +105,20 @@ class StrategyPerformanceServiceTest {
 	}
 
 	@Test
+	void 근거_조합_줄도_따로_집계한다() {
+		// given
+		add(StrategyType.COMBINED, "", 3, PrizeRank.FIFTH, true);
+		add(StrategyType.COMBINED, "", 1, PrizeRank.NONE, true);
+
+		// when
+		StrategyPerformanceResponse row = row(service().performances(), StrategyType.COMBINED);
+
+		// then
+		assertThat(row.lineCount()).isEqualTo(2);
+		assertThat(row.rankCounts().get(PrizeRank.FIFTH)).isEqualTo(1);
+	}
+
+	@Test
 	void 평균_일치와_5등_이상_비율을_계산한다() {
 		// given: 일치 0,1,3,4 -> 평균 2.0, 5등 이상 2/4
 		add(StrategyType.ALL_TIME, "", 0, PrizeRank.NONE, true);
