@@ -629,7 +629,7 @@ Run: `docker compose -f deploy/compose.yml up --build` 후 `curl -s localhost:30
 
 - [ ] **Step 5: HTTPS 경로를 연결한다**
 
-터널을 `127.0.0.1:3000`으로 연결한다. Expected: 집 밖 네트워크의 휴대폰에서 HTTPS 주소로 OTP 로그인 성공, 공유기에 새로 연 포트 없음.
+DSM 역방향 프록시로 `https://lottery-picker.o-r.kr`(443)을 `http://localhost:13000`에 연결하고 DSM에서 Let's Encrypt 인증서를 발급한다. 웹은 `127.0.0.1:13000`에만 공개하고, 공유기는 80·443만 NAS로 넘긴다. Expected: 집 밖 네트워크의 휴대폰에서 HTTPS 주소로 OTP 로그인 성공, 공유기에 연 포트는 80·443뿐. (2026-11-09 변경: 사용자 결정으로 Cloudflare Tunnel 대신 DSM 역방향 프록시)
 
 - [ ] **Step 6: 백업과 복구를 확인한다**
 

@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // 배포 이미지는 .next/standalone 의 server.js 만 실행한다 (deploy/compose.yml).
+  output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

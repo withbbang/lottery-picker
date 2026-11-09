@@ -27,3 +27,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.log
+
+# deploy/backup.sh 기본 덤프 위치
+/backups/

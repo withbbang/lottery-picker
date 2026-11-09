@@ -1,0 +1,87 @@
+# 집 서버(Synology NAS) 운영 구성. 사용법은 deploy/README.md.
+#   docker compose -f deploy/compose.yml --env-file deploy/.env up -d --build
+# 호스트에 공개하는 포트는 web의 127.0.0.1:13000 하나뿐이다.
+# HTTPS는 DSM 역방향 프록시가 받아 localhost:13000으로 넘긴다.
+
+name: lottery-picker
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  mysql:
+    image: mysql:8.4
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --skip-name-resolve
+      - --innodb-buffer-pool-size=128M
+      - --performance-schema=OFF
+      - --max-connections=50
+    environment:
+      TZ: Asia/Seoul
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?deploy/.env에 MYSQL_ROOT_PASSWORD를 넣으세요}
+      MYSQL_DATABASE: lottery
+      MYSQL_USER: ${DB_USERNAME:?deploy/.env에 DB_USERNAME을 넣으세요}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?deploy/.env에 DB_PASSWORD를 넣으세요}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # 비밀번호를 명령행 인자로 넘기지 않는다.
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 768m
+    logging: *logging
+    restart: unless-stopped
+
+  api:
+    build: ../apps/api
+    environment:
+      # 프로파일이 없으면 local(H2, 인증 꺼짐)로 뜬다. 반드시 prod.
+      SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Seoul
+      DB_URL: ${DB_URL:-jdbc:mysql://mysql:3306/lottery}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # 비어 있으면 API가 기동하지 않는다. 첫 등록 절차는 README 참고.
+      TOTP_SECRET: ${TOTP_SECRET:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      SCHEDULING_ENABLED: ${SCHEDULING_ENABLED:-true}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    mem_limit: 768m
+    logging: *logging
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../apps/web
+      args:
+        API_INTERNAL_URL: http://api:8080
+    environment:
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:13000:3000"
+    depends_on:
+      - api
+    mem_limit: 384m
+    logging: *logging
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
