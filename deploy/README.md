@@ -4,14 +4,14 @@
 
 ```
 휴대폰 ──HTTPS 443──▶ 공유기 ──▶ DSM 역방향 프록시(Let's Encrypt)
-                                      │ http://localhost:13000
+                                      │ http://127.0.0.1:13000
                                       ▼
                          web (127.0.0.1:13000 → 3000) ──/api/*──▶ api:8080 ──▶ mysql:3306
                                                        (Compose 내부 네트워크, 호스트 포트 없음)
 ```
 
 - 공유기에서 NAS로 넘기는 포트는 **80, 443 두 개뿐**이다. 13000, 3306, 8080, DSM 관리 포트(5000/5001), SSH(22)는 인터넷에 열지 않는다.
-- web은 `127.0.0.1:13000`에만 묶여 NAS 밖(같은 집 LAN 포함)에서는 직접 접속되지 않는다. api, mysql은 호스트 포트가 아예 없다.
+- web은 NAS의 루프백(`127.0.0.1:13000`)에만 묶여 네트워크 쪽으로는 공개되지 않는다. api, mysql은 호스트 포트가 아예 없다.
 - 모든 컨테이너는 `restart: unless-stopped`, `TZ=Asia/Seoul`.
 
 | 파일 | 역할 |
@@ -161,7 +161,7 @@ DSM 제어판 → 로그인 포털 → 고급 → 역방향 프록시 → 생성
 | 설명 | `lottery-picker` |
 | 소스 프로토콜 / 호스트 이름 / 포트 | HTTPS / `lottery-picker.o-r.kr` / 443 |
 | HSTS 활성화 | 켜도 된다 (선택) |
-| 대상 프로토콜 / 호스트 이름 / 포트 | HTTP / `localhost` / `13000` |
+| 대상 프로토콜 / 호스트 이름 / 포트 | HTTP / `127.0.0.1` / `13000` |
 
 - **사용자 지정 머리글은 추가하지 않는다.** 이 앱은 WebSocket을 쓰지 않는다.
 - DSM nginx는 대상에 `X-Forwarded-For`, `X-Real-IP` 같은 전달 헤더를 붙인다. 앱은 이 값을 쓰지 않으므로 따로 설정할 것이 없다.
@@ -177,8 +177,31 @@ DSM 제어판 → 로그인 포털 → 고급 → 역방향 프록시 → 생성
 
 - 휴대폰 **와이파이를 끄고** LTE/5G로 `https://lottery-picker.o-r.kr` 접속 → 자물쇠 표시, OTP 로그인 성공, 새로고침 후에도 로그인 유지.
   - 집 와이파이에서는 공유기가 NAT 루프백을 지원하지 않으면 도메인 접속이 안 될 수 있다. 바깥 망으로 확인한다.
-- 바깥 망에서 아래가 **열리지 않아야** 한다: `http://<공인 IP>:13000`, `:3306`, `:8080`, `:5000`, `:5001`.
-- 바깥 망에서 `https://<공인 IP>/`(도메인 없이)로 들어갔을 때 DSM 로그인 화면이 보이면, DSM 계정이 인터넷에 노출된 것이다. 이 경우 관리자 계정 2단계 인증, 제어판 → 보안 → 계정 → 자동 차단을 켜 둔다.
+- 바깥 망에서 아래가 **열리지 않아야** 한다: `http://<공인 IP>:13000`, `:3306`, `:8080`, `:5000`, `:5001`, `:22`.
+- 바깥 망에서 아래 주소에 **DSM 로그인 화면이나 DSM 관련 페이지가 보이지 않아야** 한다 (2-7).
+  - `http://<공인 IP>/`, `https://<공인 IP>/` (도메인 없이 IP로)
+  - `http://lottery-picker.o-r.kr/` (80, 인증서 발급용으로 열어 둔 포트)
+
+### 2-7. DSM 보호 (반드시)
+
+80·443을 NAS로 넘기면, Host가 `lottery-picker.o-r.kr`이 아닌 요청(IP 직접 접속, 스캐너 등)은 모두 DSM의 기본 nginx가 받는다. 80과 443 둘 다 해당한다. 그래서 아래는 조건 없이 모두 해 둔다.
+
+1. **관리자 계정 2단계 인증**: 관리자 권한이 있는 모든 계정에서 개인 → 보안 → 2단계 인증을 켠다.
+2. **자동 차단**: 제어판 → 보안 → 보호 → 자동 차단 사용 (예: 5분 안에 로그인 10회 실패 시 차단).
+3. **기본 `admin` 계정 비활성화**: 제어판 → 사용자 및 그룹 → `admin` → 비활성화. 이미 비활성이면 그대로 둔다.
+4. **방화벽**: 제어판 → 보안 → 방화벽 → 방화벽 사용, 프로필 규칙을 위에서부터 이 순서로 만든다.
+
+   | 순서 | 포트 | 소스 IP | 동작 |
+   |---|---|---|---|
+   | 1 | 모두 | 집 LAN 서브넷 (예: `192.168.0.0/24`, 공유기 설정에서 확인) | 허용 |
+   | 2 | TCP 80, 443 | 모두 | 허용 |
+   | — | 규칙에 없는 요청 | | 거부 |
+
+   - 결과적으로 DSM 5000/5001, SSH 22, NAS의 다른 서비스(3000, 8080 등)는 LAN에서만 열린다.
+   - 서브넷을 잘못 넣으면 NAS에 못 들어갈 수 있다. LAN에서 DSM 창을 하나 열어 둔 채로 적용하고, 새 창으로 접속되는지 확인한 뒤 닫는다.
+5. **DSM 로그인 페이지가 80/443에 나오는지 확인**: 제어판 → 로그인 포털 → DSM 탭(웹 서비스 포트, 사용자 지정 도메인, HTTP→HTTPS 자동 리디렉션)과 고급 탭을 확인한다. DSM 버전·설치 패키지(Web Station 등)에 따라 다르므로 동작을 짐작하지 말고 2-6의 바깥 망 확인으로 판단한다.
+   - IP로 접속했을 때 DSM 로그인 화면이 뜨거나 `:5000`/`:5001`로 리디렉션되면, DSM 탭의 사용자 지정 도메인·리디렉션 설정을 끄고 다시 확인한다.
+   - 그래도 DSM 페이지가 보이면 1~4가 켜져 있는지 다시 확인한다. 방화벽 4번이 있으면 리디렉션돼도 5000/5001은 바깥에서 열리지 않는다.
 
 ---
 
@@ -208,14 +231,14 @@ sudo docker image prune -f         # 이전 빌드의 이름 없는 이미지 �
 
 - `docker compose exec`로 mysql 컨테이너 안에서 `mysqldump --single-transaction`(운영 중에도 일관된 스냅숏) → gzip.
 - 비밀번호는 명령행에 싣지 않는다. 컨테이너의 `MYSQL_ROOT_PASSWORD`를 컨테이너 안에서 `MYSQL_PWD`로 넘기므로 호스트 `ps`에는 값이 보이지 않는다.
-- `backups/lottery-YYYYMMDD-HHMMSS.sql.gz`로 저장(권한 600). 끝까지 기록된 덤프(`-- Dump completed`)만 남기고, 최근 14개를 넘는 오래된 파일은 지운다.
+- `backups/lottery-YYYYMMDD-HHMMSS.sql.gz`로 저장. 전체 데이터가 들어 있으므로 폴더는 root 전용(700), 파일은 600이다. 보거나 읽을 때는 `sudo`를 붙인다. 끝까지 기록된 덤프(`-- Dump completed`)만 남기고, 최근 14개를 넘는 오래된 파일은 지운다.
 - 실패하면 0이 아닌 코드로 끝나고 반쯤 쓴 파일은 지운다.
 
 수동 실행:
 
 ```bash
 sudo bash deploy/backup.sh
-ls -l backups/
+sudo ls -l backups/
 ```
 
 ### 매일 자동 실행 (DSM 작업 스케줄러)
@@ -237,8 +260,11 @@ DSM 제어판 → 작업 스케줄러 → 생성 → 예약된 작업 → 사용
 
 ```bash
 sudo bash deploy/backup.sh
-sudo bash deploy/restore-check.sh "$(ls backups/lottery-*.sql.gz | tail -n 1)"
+sudo bash deploy/restore-check.sh            # 인자가 없으면 backups/의 가장 최근 덤프
 ```
+
+특정 덤프를 확인하려면 `sudo ls backups/`로 이름을 본 뒤 `sudo bash deploy/restore-check.sh backups/lottery-<시각>.sql.gz`.
+(`backups/`는 root 전용이라 `"$(ls backups/...)"`처럼 호출하는 셸에서 glob을 풀면 실패한다.)
 
 `restore-check.sh`는 네트워크가 없는 임시 `mysql:8.4` 컨테이너를 띄워 덤프를 복구하고, 운영 DB와 테이블별 `COUNT(*)`를 나란히 출력한 뒤 임시 컨테이너를 지운다. 운영 DB는 읽기만 한다.
 
@@ -256,8 +282,10 @@ lotto_round                        <회차 수>  <회차 수>
 
 ```bash
 sudo bash deploy/backup.sh                       # 현재 상태도 남겨 둔다
+sudo ls backups/                                 # 되돌릴 덤프 이름 확인
+sudo -v                                          # 파이프 양쪽의 sudo가 비밀번호를 동시에 묻지 않게 미리 인증
 dc stop api web
-gzip -dc backups/lottery-<복구할 시각>.sql.gz \
+sudo gzip -dc backups/lottery-<복구할 시각>.sql.gz \
   | dc exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot "$MYSQL_DATABASE"'
 dc start api web
 ```
@@ -269,6 +297,7 @@ dc start api web
 ## 5. 재부팅과 1주 운영 (Step 7)
 
 - DSM 패키지 센터에서 Container Manager가 실행 중이면, 재부팅 후 Docker가 올라오면서 `unless-stopped` 컨테이너가 자동으로 다시 뜬다. `dc stop`으로 멈춘 컨테이너는 재부팅 후에도 멈춘 상태로 남는다.
+- 재부팅 때는 Docker가 컨테이너를 한꺼번에 다시 띄우므로 `depends_on`의 `service_healthy`(mysql 준비 후 api 기동)가 지켜지지 않는다. api가 mysql보다 먼저 준비되면 DB 접속에 실패해 종료하고, 재시작 정책으로 다시 뜬다. **재부팅 직후 api가 한두 번 재시작되는 것은 정상이다.** 몇 분 뒤 `dc ps`에서 api가 `(healthy)`면 된다. 계속 재시작되면 `dc logs --tail 100 api`로 원인을 본다.
 - 재부팅 후 확인: `dc ps`, `curl -s localhost:13000/api/v1/health`, 휴대폰에서 HTTPS 접속.
 - 7일 동안 확인: 매일 17:00 텔레그램 추천 알림, 토요일 추첨 후 결과 알림, 비교 화면.
 

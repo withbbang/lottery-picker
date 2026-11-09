@@ -1,20 +1,40 @@
 #!/usr/bin/env bash
 # 백업 덤프를 임시 MySQL 컨테이너(포트 비공개)에 복구하고, 운영 DB와 테이블별 행 수를 비교한다.
 # 운영 DB는 읽기만 한다. 끝나면 임시 컨테이너를 지운다.
-#   sudo bash deploy/restore-check.sh backups/lottery-YYYYMMDD-HHMMSS.sql.gz
+#   sudo bash deploy/restore-check.sh                 # BACKUP_DIR의 가장 최근 덤프
+#   sudo bash deploy/restore-check.sh <덤프 파일>     # 지정한 덤프
 # 덤프 직후에 실행한다. 덤프 뒤에 운영 DB가 바뀌면(수집, 로그인 등) 그만큼 행 수가 달라진다.
-# 환경변수(선택): ENV_FILE (기본 deploy/.env), COMPOSE_PROJECT, MYSQL_IMAGE (기본 mysql:8.4)
+# 환경변수(선택): BACKUP_DIR (기본 저장소 최상위 backups/), ENV_FILE (기본 deploy/.env),
+#   COMPOSE_PROJECT, MYSQL_IMAGE (기본 mysql:8.4)
 set -euo pipefail
 
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-if [[ $# -ne 1 || ! -f "$1" ]]; then
-	echo "사용법: $0 <lottery-*.sql.gz>" >&2
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups}"
+
+# 덤프는 root 전용(600)이라 호출하는 셸에서 glob을 풀 수 없다. 기본값은 스크립트 안에서 찾는다.
+if [[ $# -gt 1 ]]; then
+	echo "사용법: $0 [lottery-*.sql.gz]" >&2
 	exit 2
 fi
-dump="$1"
+if [[ $# -eq 1 ]]; then
+	dump="$1"
+else
+	# 폴더가 없거나 읽을 수 없으면 find가 실패한다. pipefail로 조용히 끝나지 않게 빈 값으로 받는다.
+	dump="$({ find "$BACKUP_DIR" -maxdepth 1 -type f -name 'lottery-*.sql.gz' 2> /dev/null || true; } | sort | tail -n 1)"
+	if [[ -z "$dump" ]]; then
+		echo "$BACKUP_DIR 에서 lottery-*.sql.gz 를 찾지 못했습니다. sudo로 실행했는지, backup.sh를 먼저 실행했는지 확인하세요." >&2
+		exit 2
+	fi
+fi
+if [[ ! -r "$dump" ]]; then
+	echo "덤프를 읽을 수 없습니다: $dump (sudo로 실행했는지 확인)" >&2
+	exit 2
+fi
+echo "확인할 덤프: $dump"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
 MYSQL_IMAGE="${MYSQL_IMAGE:-mysql:8.4}"
 compose=(docker compose -f "$SCRIPT_DIR/compose.yml" --env-file "$ENV_FILE")

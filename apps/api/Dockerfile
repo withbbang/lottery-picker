@@ -17,6 +17,8 @@ RUN ./gradlew --no-daemon bootJar -x test \
 FROM eclipse-temurin:17-jre
 RUN groupadd --system app && useradd --system --gid app --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /app
+# 프로파일이 없으면 local(H2, 인증 꺼짐)로 뜬다. compose도 명시하지만 이미지 단독 실행에도 막아 둔다.
+ENV SPRING_PROFILES_ACTIVE=prod
 # extracted/app.jar 의 매니페스트가 lib/ 를 클래스패스로 가리킨다.
 COPY --from=build /workspace/extracted/ ./
 USER app

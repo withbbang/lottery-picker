@@ -617,19 +617,19 @@ Expected: Flyway 적용, `ddl-auto: validate` 통과, 기동 성공. 확인 후 
 
 - [ ] **Step 3: Compose를 작성하고 로컬에서 확인한다**
 
-- `mysql:8`(볼륨 유지, 포트 비공개), `api`(`SPRING_PROFILES_ACTIVE=prod`, 포트 비공개), `web`(`127.0.0.1:3000`만 공개), 전부 `restart: unless-stopped`, `TZ=Asia/Seoul`.
+- `mysql:8`(볼륨 유지, 포트 비공개), `api`(`SPRING_PROFILES_ACTIVE=prod`, 포트 비공개), `web`(`127.0.0.1:13000`만 공개, NAS의 3000이 사용 중), 전부 `restart: unless-stopped`, `TZ=Asia/Seoul`. (2026-11-09 변경)
 - 웹 이미지는 `API_INTERNAL_URL=http://api:8080`을 빌드 인자로 받는다.
 - 시크릿은 서버의 `deploy/.env`에 두고 Git에 넣지 않는다. 키 이름만 `deploy/.env.example`에 적고 `.gitignore`를 확인한다.
 
-Run: `docker compose -f deploy/compose.yml up --build` 후 `curl -s localhost:3000/api/v1/health`. Expected: `"status":"UP"`, `curl localhost:3000/api/v1/rounds`는 401, API 8080은 호스트에서 접속 불가.
+Run: `docker compose -f deploy/compose.yml up --build` 후 `curl -s localhost:13000/api/v1/health`. Expected: `"status":"UP"`, `curl localhost:13000/api/v1/rounds`는 401, API 8080은 호스트에서 접속 불가.
 
 - [ ] **Step 4: 서버에 배포하고 OTP를 등록한다**
 
-`master`를 체크아웃해 실행하고, `totpSetup` 출력으로 시크릿을 넣고 재시작한다. 사용자가 OTP 앱에 등록한 뒤 로그인을 확인한다.
+NAS에는 git이 없으므로 Mac에서 `git archive`로 `master`를 묶어 `scp`로 보내고 NAS에서 풀어 `docker compose -f deploy/compose.yml --env-file deploy/.env up -d --build`로 실행한다(절차는 `deploy/README.md`). 기동 전에 `totpSetup` 출력으로 시크릿을 넣는다. (2026-11-09 변경) 사용자가 OTP 앱에 등록한 뒤 로그인을 확인한다.
 
 - [ ] **Step 5: HTTPS 경로를 연결한다**
 
-DSM 역방향 프록시로 `https://lottery-picker.o-r.kr`(443)을 `http://localhost:13000`에 연결하고 DSM에서 Let's Encrypt 인증서를 발급한다. 웹은 `127.0.0.1:13000`에만 공개하고, 공유기는 80·443만 NAS로 넘긴다. Expected: 집 밖 네트워크의 휴대폰에서 HTTPS 주소로 OTP 로그인 성공, 공유기에 연 포트는 80·443뿐. (2026-11-09 변경: 사용자 결정으로 Cloudflare Tunnel 대신 DSM 역방향 프록시)
+DSM 역방향 프록시로 `https://lottery-picker.o-r.kr`(443)을 `http://127.0.0.1:13000`에 연결하고 DSM에서 Let's Encrypt 인증서를 발급한다. 웹은 `127.0.0.1:13000`에만 공개하고, 공유기는 80·443만 NAS로 넘긴다. Expected: 집 밖 네트워크의 휴대폰에서 HTTPS 주소로 OTP 로그인 성공, 공유기에 연 포트는 80·443뿐. (2026-11-09 변경: 사용자 결정으로 Cloudflare Tunnel 대신 DSM 역방향 프록시)
 
 - [ ] **Step 6: 백업과 복구를 확인한다**
 
