@@ -274,6 +274,45 @@ class CollectionJobTest {
 	}
 
 	@Test
+	void 확인_시각이_아니어도_채점_대기_회차를_처리한다() {
+		// given: 수집이나 채점이 중간에 실패해 채점하지 못한 회차가 남았다
+		when(postDraw.pendingRounds()).thenReturn(List.of(1248));
+
+		// when
+		jobAt("2026-11-06T12:00").poll();
+
+		// then
+		verify(collector, never()).syncMissingRounds();
+		verify(postDraw).process(1248);
+	}
+
+	@Test
+	void 수집이_실패해도_채점_대기_회차를_처리하고_재발송한다() {
+		// given
+		when(collector.syncMissingRounds()).thenThrow(new CollectorException("HTML 응답"));
+		when(postDraw.pendingRounds()).thenReturn(List.of(1248));
+
+		// when
+		assertThatThrownBy(() -> jobAt("2026-11-07T20:40").poll()).isInstanceOf(CollectorException.class);
+
+		// then
+		verify(postDraw).process(1248);
+		verify(postDraw).resendUnsent();
+	}
+
+	@Test
+	void 채점_대기_조회가_실패해도_재발송한다() {
+		// given
+		when(postDraw.pendingRounds()).thenThrow(new IllegalStateException("DB 오류"));
+
+		// when
+		assertThatCode(() -> jobAt("2026-11-06T12:00").poll()).doesNotThrowAnyException();
+
+		// then
+		verify(postDraw).resendUnsent();
+	}
+
+	@Test
 	void 수집과_처리를_마친_뒤_재발송한다() {
 		// given
 		when(collector.syncMissingRounds()).thenReturn(List.of(1249));

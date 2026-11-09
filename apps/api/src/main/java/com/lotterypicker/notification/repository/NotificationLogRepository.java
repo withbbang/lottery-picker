@@ -17,19 +17,24 @@ public interface NotificationLogRepository extends Repository<NotificationLog, L
 
 	Optional<NotificationLog> findByKindAndTargetKey(NotificationKind kind, String targetKey);
 
-	/** 실패했거나 발송 중 멈춘 기록을 선점한다. 갱신된 행이 1이면 이 호출이 보낼 차례다. */
+	/**
+	 * 실패했거나 발송 중 멈춘 기록을 선점한다. 갱신된 행이 1이면 이 호출이 보낼 차례다.
+	 * 실패 기록은 누적 시도가 maxAttempts 미만일 때만 다시 보낸다.
+	 */
 	@Transactional
 	@Modifying
 	@Query("""
 			update NotificationLog n
 			set n.status = com.lotterypicker.notification.NotificationStatus.PENDING, n.updatedAt = :now
 			where n.kind = :kind and n.targetKey = :targetKey
-			  and (n.status = com.lotterypicker.notification.NotificationStatus.FAILED
+			  and ((n.status = com.lotterypicker.notification.NotificationStatus.FAILED
+			      and n.attempts < :maxAttempts)
 			    or (n.status = com.lotterypicker.notification.NotificationStatus.PENDING
 			      and n.updatedAt < :staleBefore))
 			""")
 	int reclaim(@Param("kind") NotificationKind kind, @Param("targetKey") String targetKey,
-			@Param("now") LocalDateTime now, @Param("staleBefore") LocalDateTime staleBefore);
+			@Param("now") LocalDateTime now, @Param("staleBefore") LocalDateTime staleBefore,
+			@Param("maxAttempts") int maxAttempts);
 
 	@Transactional
 	@Modifying

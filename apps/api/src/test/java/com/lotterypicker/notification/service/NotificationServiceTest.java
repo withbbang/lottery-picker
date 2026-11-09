@@ -183,6 +183,23 @@ class NotificationServiceTest {
 	}
 
 	@Test
+	void 발송이_3번_모두_실패하면_더_이상_다시_보내지_않는다() {
+		// given: 3번의 발송(각 3회 시도)이 모두 실패했다
+		doThrow(new TelegramException("HTTP 500")).when(telegram).send(anyString());
+		service.sendOnce(KIND, key, "본문");
+		service.sendOnce(KIND, key, "본문");
+		service.sendOnce(KIND, key, "본문");
+
+		// when
+		NotificationStatus result = service.sendOnce(KIND, key, "본문");
+
+		// then
+		assertThat(result).isEqualTo(NotificationStatus.FAILED);
+		assertThat(logs.findByKindAndTargetKey(KIND, key).orElseThrow().getAttempts()).isEqualTo(9);
+		verify(telegram, times(9)).send("본문");
+	}
+
+	@Test
 	void 진행_중인_PENDING은_보내지_않는다() {
 		// given: 다른 스레드가 방금 선점했다
 		logs.saveAndFlush(NotificationLog.pending(KIND, key, NOW.minusMinutes(5)));

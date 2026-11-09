@@ -48,8 +48,10 @@ public class CollectionJob {
 	private final Clock clock;
 
 	/**
-	 * 확인 시각이면 수집하고, 매번 보내지 못한 최근 종료 알림을 다시 보낸다. 재발송은 수집이 실패해도 한다.
-	 * 재발송은 최근 두 회차만 보고 이미 보낸 회차는 건너뛰므로 5분마다 돌아도 가볍다.
+	 * 확인 시각이면 수집하고, 매번 채점 대기 회차를 처리한 뒤 보내지 못한 최근 종료 알림을 다시 보낸다.
+	 * 대기 회차 처리와 재발송은 수집이 실패해도 한다. 수집이나 채점이 중간에 실패한 회차를 텔레그램 설정과 관계없이
+	 * 다음 5분 확인에서 채점하기 위해서다. 대기 회차가 없으면 조회 한 번이고, 재발송은 최근 두 회차만 보고 이미 보낸
+	 * 회차는 건너뛰므로 5분마다 돌아도 가볍다.
 	 */
 	@Scheduled(cron = "0 */5 * * * *", zone = "Asia/Seoul")
 	public void poll() {
@@ -59,15 +61,32 @@ public class CollectionJob {
 			return;
 		}
 		ZonedDateTime now = ZonedDateTime.now(clock);
-		lock.tryRun("5분 확인", () -> {
-			try {
-				if (PollPolicy.isDue(now, latest.get())) {
-					collectDue(now, latest.get());
-				}
-			} finally {
-				postDraw.resendUnsent();
+		lock.tryRun("5분 확인", () -> pollHolding(now, latest.get()));
+	}
+
+	/** 수집을 끝까지 마쳤으면 대기 회차도 이미 처리했으므로 다시 처리하지 않는다. */
+	private void pollHolding(ZonedDateTime now, LocalDate latest) {
+		boolean processed = false;
+		try {
+			if (PollPolicy.isDue(now, latest)) {
+				collectDue(now, latest);
+				processed = true;
 			}
-		});
+		} finally {
+			if (!processed) {
+				processPendingRounds();
+			}
+			postDraw.resendUnsent();
+		}
+	}
+
+	/** 조회가 실패해도 재발송은 이어서 하도록 예외를 기록만 한다. 다음 5분 확인에서 다시 본다. */
+	private void processPendingRounds() {
+		try {
+			processRounds(postDraw.pendingRounds());
+		} catch (RuntimeException e) {
+			log.error("채점 대기 회차 처리 실패", e);
+		}
 	}
 
 	private void collectDue(ZonedDateTime now, LocalDate latest) {
@@ -109,6 +128,10 @@ public class CollectionJob {
 		}
 		TreeSet<Integer> targets = new TreeSet<>(collected);
 		targets.addAll(postDraw.pendingRounds());
+		processRounds(targets);
+	}
+
+	private void processRounds(Iterable<Integer> targets) {
 		// 한 회차가 실패해도 나머지 회차와 이어지는 판매점 수집은 계속한다. 실패한 회차는 대기 회차로 다시 잡힌다.
 		for (int round : targets) {
 			try {

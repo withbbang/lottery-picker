@@ -24,6 +24,12 @@ public class NotificationService {
 
 	private static final int MAX_ATTEMPTS = 3;
 
+	/**
+	 * 한 알림을 보내려는 발송(각 {@link #MAX_ATTEMPTS}회 시도)의 최대 횟수. 처음 발송과 재발송을 합친다.
+	 * 이만큼 모두 실패한 FAILED 기록은 다시 선점하지 않는다. 5분 재발송이 텔레그램 장애 동안 끝없이 시도하지 않게 하기 위해서다.
+	 */
+	private static final int MAX_DELIVERIES = 3;
+
 	/** 재시도 3회의 최악 시간(약 2분)보다 길게 잡는다. 이보다 오래된 PENDING은 발송 중 서버가 멈춘 기록이다. */
 	private static final Duration STALE_PENDING = Duration.ofMinutes(5);
 
@@ -65,7 +71,7 @@ public class NotificationService {
 	private boolean claim(NotificationKind kind, String targetKey) {
 		LocalDateTime now = LocalDateTime.now(clock);
 		if (logs.findByKindAndTargetKey(kind, targetKey).isPresent()) {
-			return logs.reclaim(kind, targetKey, now, now.minus(STALE_PENDING)) == 1;
+			return logs.reclaim(kind, targetKey, now, now.minus(STALE_PENDING), MAX_ATTEMPTS * MAX_DELIVERIES) == 1;
 		}
 		try {
 			logs.saveAndFlush(NotificationLog.pending(kind, targetKey, now));
