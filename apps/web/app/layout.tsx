@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_KR } from "next/font/google";
 
 import { QueryProvider } from "@/components/providers/QueryProvider";
@@ -22,6 +22,19 @@ export const metadata: Metadata = {
   title: "로또 번호 추첨",
   description:
     "역대 당첨번호 통계로 매일 추천 번호 5줄을 만들고, 추첨 뒤 채점합니다.",
+  appleWebApp: {
+    capable: true,
+    title: "로또 추첨",
+    statusBarStyle: "default",
+  },
+};
+
+// globals.css 의 --slip(라이트), --paper(다크) 값.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#c42f4f" },
+    { media: "(prefers-color-scheme: dark)", color: "#10151f" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
