@@ -15,6 +15,7 @@ const set: RecommendationSetResponse = {
   historyFromRound: 1,
   historyToRound: 1248,
   disclaimer: DISCLAIMER,
+  notificationStatus: "SENT",
   lines: [
     {
       strategy: "RECENT_HOT",
@@ -135,6 +136,38 @@ describe("RecommendationCard", () => {
 
     // then
     expect(await screen.findByText(DISCLAIMER)).toBeInTheDocument();
+  });
+
+  it("shows a warning when the telegram send failed", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { ...set, notificationStatus: "FAILED" },
+        }),
+      ),
+    );
+
+    // when
+    renderCard();
+
+    // then
+    expect(await screen.findByText("텔레그램 발송 실패")).toBeInTheDocument();
+  });
+
+  it("hides the warning unless the telegram send failed", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: set })),
+    );
+
+    // when
+    renderCard();
+
+    // then
+    await screen.findAllByRole("article");
+    expect(screen.queryByText("텔레그램 발송 실패")).not.toBeInTheDocument();
   });
 
   it("shows an empty message on 204", async () => {

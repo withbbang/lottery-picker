@@ -47,6 +47,9 @@ export function RecommendationCard() {
         <span className="font-semibold">{data.round}회</span>
         <span className="opacity-70">{data.date}</span>
       </p>
+      {data.notificationStatus === "FAILED" && (
+        <p className="text-sm font-medium">텔레그램 발송 실패</p>
+      )}
       <div className="flex flex-col">
         {data.lines.map((line) => (
           <article

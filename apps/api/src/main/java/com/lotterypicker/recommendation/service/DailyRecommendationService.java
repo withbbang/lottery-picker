@@ -2,6 +2,8 @@ package com.lotterypicker.recommendation.service;
 
 import com.lotterypicker.common.BusinessException;
 import com.lotterypicker.common.ErrorCode;
+import com.lotterypicker.notification.NotificationKind;
+import com.lotterypicker.notification.service.NotificationService;
 import com.lotterypicker.recommendation.RecommendationSet;
 import com.lotterypicker.recommendation.RoundCalendar;
 import com.lotterypicker.recommendation.StoredLine;
@@ -54,6 +56,7 @@ public class DailyRecommendationService {
 	private final Random random;
 	private final Clock clock;
 	private final TransactionOperations transactions;
+	private final NotificationService notifications;
 
 	public LocalDate today() {
 		return LocalDate.now(clock);
@@ -106,7 +109,21 @@ public class DailyRecommendationService {
 		DailyRecommendation first = lines.get(0);
 		return Optional.of(new RecommendationSetResponse(first.getDate(), first.getRoundNo(),
 				lines.stream().map(RecommendationLineResponse::from).toList(), first.getHistoryFromRound(),
-				first.getHistoryToRound(), RecommendationSetResponse.DISCLAIMER));
+				first.getHistoryToRound(), RecommendationSetResponse.DISCLAIMER,
+				notifications.statusOf(NotificationKind.DAILY_RECOMMENDATION, date.toString())));
+	}
+
+	/** 알림 재발송용 조회. 대조군은 알림에 보내지 않으므로 뺀다. */
+	public Optional<RecommendationSet> findSet(LocalDate date) {
+		List<DailyRecommendation> lines = repository.findByDateOrderByLineIndexAsc(date).stream()
+			.filter(line -> !line.isControl())
+			.toList();
+		if (lines.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(new RecommendationSet(date, lines.get(0).getRoundNo(), lines.stream()
+			.map(line -> new StoredLine(line.getStrategy(), line.numbers(), line.getEvidence(), line.getRelaxation()))
+			.toList()));
 	}
 
 	private static DrawHistory toHistory(List<LottoRound> stored) {

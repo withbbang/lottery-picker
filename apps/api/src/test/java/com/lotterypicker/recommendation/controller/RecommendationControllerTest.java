@@ -13,6 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.lotterypicker.lotto.LottoNumbers;
+import com.lotterypicker.notification.NotificationKind;
+import com.lotterypicker.notification.NotificationStatus;
+import com.lotterypicker.notification.service.NotificationService;
 import com.lotterypicker.recommendation.engine.RecommendationEngine;
 import com.lotterypicker.recommendation.engine.Relaxation;
 import com.lotterypicker.recommendation.engine.StrategyType;
@@ -81,6 +84,23 @@ class RecommendationControllerTest {
 
 	@MockitoBean
 	private DailyRecommendationRepository repository;
+
+	@MockitoBean
+	private NotificationService notifications;
+
+	@Test
+	void 응답에_알림_상태를_담는다() throws Exception {
+		// given
+		given(repository.findByDateOrderByLineIndexAsc(TODAY)).willReturn(storedSet(TODAY));
+		given(notifications.statusOf(NotificationKind.DAILY_RECOMMENDATION, "2026-11-06"))
+			.willReturn(NotificationStatus.FAILED);
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations"));
+
+		// then
+		result.andExpect(jsonPath("$.data.notificationStatus").value("FAILED"));
+	}
 
 	private static DailyRecommendation line(LocalDate date, StrategyType strategy, int lineIndex) {
 		return DailyRecommendation.builder()

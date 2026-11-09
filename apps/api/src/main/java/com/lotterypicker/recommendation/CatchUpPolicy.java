@@ -18,13 +18,17 @@ public final class CatchUpPolicy {
 		if (alreadyGenerated) {
 			return false;
 		}
-		ZonedDateTime seoul = now.withZoneSameInstant(ClockConfig.SEOUL);
-		LocalTime time = seoul.toLocalTime();
-		if (time.isBefore(GENERATION_TIME)) {
+		if (now.withZoneSameInstant(ClockConfig.SEOUL).toLocalTime().isBefore(GENERATION_TIME)) {
 			return false;
 		}
 		// 판매가 마감된 회차의 추천이 생기거나 당첨번호가 통계에 섞이지 않게 한다.
-		return seoul.getDayOfWeek() != DayOfWeek.SATURDAY || time.isBefore(SALES_CLOSE);
+		return salesOpen(now);
+	}
+
+	/** 그날 만든 추천의 회차를 아직 살 수 있는지. 토요일 20시에 판매가 마감된다. */
+	public static boolean salesOpen(ZonedDateTime now) {
+		ZonedDateTime seoul = now.withZoneSameInstant(ClockConfig.SEOUL);
+		return seoul.getDayOfWeek() != DayOfWeek.SATURDAY || seoul.toLocalTime().isBefore(SALES_CLOSE);
 	}
 
 }

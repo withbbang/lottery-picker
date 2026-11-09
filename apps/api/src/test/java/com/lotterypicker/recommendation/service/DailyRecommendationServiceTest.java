@@ -13,6 +13,9 @@ import static org.mockito.Mockito.when;
 import com.lotterypicker.common.BusinessException;
 import com.lotterypicker.common.ErrorCode;
 import com.lotterypicker.lotto.LottoNumbers;
+import com.lotterypicker.notification.NotificationKind;
+import com.lotterypicker.notification.NotificationStatus;
+import com.lotterypicker.notification.service.NotificationService;
 import com.lotterypicker.recommendation.RecommendationSet;
 import com.lotterypicker.recommendation.StoredLine;
 import com.lotterypicker.recommendation.engine.DrawHistory;
@@ -64,6 +67,7 @@ class DailyRecommendationServiceTest {
 	private LottoRoundRepository rounds;
 	private DailyRecommendationRepository repository;
 	private DailyRecommendationService service;
+	private final NotificationService notifications = mock(NotificationService.class);
 	private final List<DailyRecommendation> db = new ArrayList<>();
 	private final RecordingTransactions transactions = new RecordingTransactions();
 	private TimeZone originalZone;
@@ -98,7 +102,7 @@ class DailyRecommendationServiceTest {
 
 	private DailyRecommendationService serviceAt(Clock clock) {
 		return new DailyRecommendationService(engine, settings, rounds, repository, new Random(42), clock,
-			transactions);
+			transactions, notifications);
 	}
 
 	/** 추첨일이 7일 간격인 회차들. 오름차순으로 돌려준다. */
@@ -360,6 +364,38 @@ class DailyRecommendationServiceTest {
 	void 없는_날짜는_조회_결과가_비어_있다() {
 		// when, then
 		assertThat(service.find(DATE)).isEmpty();
+	}
+
+	@Test
+	void 조회_결과에_그날_추천_알림의_상태를_담는다() {
+		// given
+		service.generateIfAbsent(DATE);
+		when(notifications.statusOf(NotificationKind.DAILY_RECOMMENDATION, "2026-11-06"))
+			.thenReturn(NotificationStatus.FAILED);
+
+		// when
+		var found = service.find(DATE).orElseThrow();
+
+		// then
+		assertThat(found.notificationStatus()).isEqualTo(NotificationStatus.FAILED);
+	}
+
+	@Test
+	void 저장된_추천을_대조군_없이_다시_읽는다() {
+		// given
+		RecommendationSet created = service.generateIfAbsent(DATE).orElseThrow();
+
+		// when
+		RecommendationSet stored = service.findSet(DATE).orElseThrow();
+
+		// then
+		assertThat(stored).isEqualTo(created);
+	}
+
+	@Test
+	void 없는_날짜의_저장된_추천은_비어_있다() {
+		// when, then
+		assertThat(service.findSet(DATE)).isEmpty();
 	}
 
 	private static final class RecordingTransactions implements TransactionOperations {

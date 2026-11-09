@@ -10,6 +10,8 @@ export type RecommendationLineResponse = {
   relaxation: Relaxation;
 };
 
+export type NotificationStatus = "PENDING" | "SENT" | "FAILED" | "SKIPPED";
+
 export type RecommendationSetResponse = {
   date: string;
   round: number;
@@ -17,6 +19,7 @@ export type RecommendationSetResponse = {
   historyFromRound: number;
   historyToRound: number;
   disclaimer: string;
+  notificationStatus: NotificationStatus;
 };
 
 export type RecommendationSettingsRequest = {

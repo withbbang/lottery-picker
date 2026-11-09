@@ -73,4 +73,12 @@ class CatchUpPolicyTest {
 		assertThat(CatchUpPolicy.shouldGenerate(at("2026-11-07T11:00:00Z"), false)).isFalse();
 	}
 
+	@Test
+	void 토요일_20시부터_판매_마감이다() {
+		// when, then
+		assertThat(CatchUpPolicy.salesOpen(at("2026-11-07T19:59:00+09:00[Asia/Seoul]"))).isTrue();
+		assertThat(CatchUpPolicy.salesOpen(at("2026-11-07T20:00:00+09:00[Asia/Seoul]"))).isFalse();
+		assertThat(CatchUpPolicy.salesOpen(at("2026-11-08T20:00:00+09:00[Asia/Seoul]"))).isTrue();
+	}
+
 }
