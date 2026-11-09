@@ -5,6 +5,9 @@ public enum PrizeRank {
 
 	FIRST, SECOND, THIRD, FOURTH, FIFTH, NONE;
 
+	/** 5등 이상 조합 수 / 전체 조합 수. 1등 1 + 2·3등 합 234 + 4등 11,115 + 5등 182,780 = 194,130. */
+	public static final double AT_LEAST_FIFTH_RATE = 194_130d / 8_145_060d;
+
 	public static PrizeRank of(LottoNumbers line, LottoNumbers winning, int bonus) {
 		return switch (line.countMatches(winning)) {
 			case 6 -> FIRST;

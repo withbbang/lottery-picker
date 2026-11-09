@@ -126,9 +126,10 @@ public class DailyRecommendationService {
 			.toList()));
 	}
 
-	private static DrawHistory toHistory(List<LottoRound> stored) {
+	/** 저장된 회차를 엔진 입력으로 바꾼다. 시뮬레이션도 같은 변환을 쓴다. */
+	public static DrawHistory toHistory(List<LottoRound> stored) {
 		return new DrawHistory(
-				stored.stream().map(r -> new HistoricalDraw(r.getRoundNo(), r.numbers())).toList());
+				stored.stream().map(r -> new HistoricalDraw(r.getRoundNo(), r.numbers(), r.getBonus())).toList());
 	}
 
 	private List<DailyRecommendation> toRows(GeneratedSet generated, LocalDate date, int round,

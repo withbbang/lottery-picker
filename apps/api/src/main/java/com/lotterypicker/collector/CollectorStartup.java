@@ -1,6 +1,7 @@
 package com.lotterypicker.collector;
 
 import com.lotterypicker.recommendation.RecommendationJob;
+import com.lotterypicker.simulation.service.SimulationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
  * 기동 직후 누락 회차와 판매점을 백그라운드로 수집하고, 새 회차와 채점 대기 회차를 처리한다.
  * 전체 적재가 오래 걸려도 기동을 막지 않는다. 그날 추천 보충은 회차 적재 뒤, 오래 걸릴 수 있는 판매점 수집 앞에서 한다.
  * 5분 확인이 이미 수집 중이면 수집은 건너뛰고 추천 보충만 한다.
+ * 마지막으로 시뮬레이션 결과가 없으면 이 스레드에서 계산한다. 새 회차 재계산은 {@link CollectionJob}이 요청한다.
  */
 @Slf4j
 @Component
@@ -23,12 +25,22 @@ public class CollectorStartup {
 	private final CollectionLock lock;
 	private final CollectionJob collection;
 	private final RecommendationJob recommendationJob;
+	private final SimulationService simulation;
 
 	@Async
 	@EventListener(ApplicationReadyEvent.class)
 	public void collectOnStartup() {
 		if (!lock.tryRun("기동 수집", this::collect)) {
 			catchUpRecommendation();
+		}
+		simulateIfAbsent();
+	}
+
+	private void simulateIfAbsent() {
+		try {
+			simulation.refreshIfAbsent();
+		} catch (RuntimeException e) {
+			log.error("기동 시 시뮬레이션 확인 실패", e);
 		}
 	}
 

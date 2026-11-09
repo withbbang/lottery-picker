@@ -8,6 +8,7 @@ import com.lotterypicker.recommendation.RoundCalendar;
 import com.lotterypicker.result.service.PostDrawService;
 import com.lotterypicker.round.entity.LottoRound;
 import com.lotterypicker.round.repository.LottoRoundRepository;
+import com.lotterypicker.simulation.service.SimulationService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -43,6 +44,7 @@ public class CollectionJob {
 	private final NotificationService notifications;
 	private final LottoRoundRepository rounds;
 	private final CollectionLock lock;
+	private final SimulationService simulation;
 	private final Clock clock;
 
 	/**
@@ -82,7 +84,11 @@ public class CollectionJob {
 		lock.runWaiting("판매점 수집", STORE_SYNC_LOCK_WAIT, this::collectStores);
 	}
 
-	/** 잠금 없이 회차를 수집하고 새 회차와 대기 회차를 처리한다. 호출하는 쪽이 잠금을 잡는다. */
+	/**
+	 * 잠금 없이 회차를 수집하고 새 회차와 대기 회차를 처리한다. 호출하는 쪽이 잠금을 잡는다.
+	 * 새 회차를 하나 이상 저장했으면 시뮬레이션 재계산을 한 번만 요청한다. 초기 적재처럼 회차가 많이 들어와도
+	 * 회차마다 다시 계산하지 않기 위해서다. 재계산은 비동기라 수집 잠금을 오래 잡지 않는다.
+	 */
 	public void collectRounds() {
 		List<Integer> collected;
 		try {
@@ -100,6 +106,9 @@ public class CollectionJob {
 			} catch (RuntimeException e) {
 				log.error("{}회 추첨 후 처리 실패", round, e);
 			}
+		}
+		if (!collected.isEmpty()) {
+			simulation.refresh();
 		}
 	}
 

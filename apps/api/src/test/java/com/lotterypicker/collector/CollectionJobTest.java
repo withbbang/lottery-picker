@@ -22,6 +22,7 @@ import com.lotterypicker.notification.service.NotificationService;
 import com.lotterypicker.result.service.PostDrawService;
 import com.lotterypicker.round.entity.LottoRound;
 import com.lotterypicker.round.repository.LottoRoundRepository;
+import com.lotterypicker.simulation.service.SimulationService;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,6 +49,7 @@ class CollectionJobTest {
 	private final PostDrawService postDraw = mock(PostDrawService.class);
 	private final NotificationService notifications = mock(NotificationService.class);
 	private final LottoRoundRepository rounds = mock(LottoRoundRepository.class);
+	private final SimulationService simulation = mock(SimulationService.class);
 	private final CollectionLock lock = new CollectionLock();
 
 	@BeforeEach
@@ -65,7 +67,7 @@ class CollectionJobTest {
 
 	private CollectionJob jobAt(String seoulDateTime) {
 		Clock clock = Clock.fixed(LocalDateTime.parse(seoulDateTime).atZone(SEOUL).toInstant(), SEOUL);
-		return new CollectionJob(collector, postDraw, notifications, rounds, lock, clock);
+		return new CollectionJob(collector, postDraw, notifications, rounds, lock, simulation, clock);
 	}
 
 	@Test
@@ -141,6 +143,32 @@ class CollectionJobTest {
 		order.verify(postDraw).process(1249);
 		order.verify(postDraw).process(1250);
 		verify(postDraw, times(3)).process(anyInt());
+	}
+
+	@Test
+	void 새_회차_처리_후_다시_계산한다() {
+		// given: 한 번에 여러 회차가 들어와도
+		when(collector.syncMissingRounds()).thenReturn(List.of(1249, 1250));
+
+		// when
+		jobAt("2026-11-14T21:00").collectRounds();
+
+		// then: 시뮬레이션은 회차 처리 뒤 한 번만 요청한다
+		InOrder order = inOrder(postDraw, simulation);
+		order.verify(postDraw).process(1250);
+		order.verify(simulation, times(1)).refresh();
+	}
+
+	@Test
+	void 새_회차가_없으면_다시_계산하지_않는다() {
+		// given: 채점 대기 회차만 있다
+		when(postDraw.pendingRounds()).thenReturn(List.of(1247));
+
+		// when
+		jobAt("2026-11-13T12:00").collectRounds();
+
+		// then
+		verify(simulation, never()).refresh();
 	}
 
 	@Test

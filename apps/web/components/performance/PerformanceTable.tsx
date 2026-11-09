@@ -10,7 +10,11 @@ import type {
   StrategyPerformancesResponse,
 } from "@/types/api/performance";
 
-const LABELS: Record<StrategyPerformanceResponse["strategy"], string> = {
+/** 성적표와 시뮬레이션이 같이 쓰는 전략 이름. */
+export const PERFORMANCE_LABELS: Record<
+  StrategyPerformanceResponse["strategy"],
+  string
+> = {
   ...STRATEGY_LABELS,
   CONTROL: "대조군",
 };
@@ -73,7 +77,7 @@ export function PerformanceTable() {
               return (
                 <tr key={s.strategy} className="border-t border-current/20 align-top">
                   <th scope="row" className="py-1 text-left font-normal">
-                    <span>{LABELS[s.strategy]}</span>
+                    <span>{PERFORMANCE_LABELS[s.strategy]}</span>
                     <span className="block text-xs opacity-70">
                       {RANKS.map(([rank, label]) => `${label} ${s.rankCounts[rank]}`).join(" · ")}
                     </span>

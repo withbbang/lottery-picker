@@ -23,8 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class StrategyPerformanceService {
 
-	/** 5등 이상 조합 수 / 전체 조합 수. 1등 1 + 2·3등 합 234 + 4등 11,115 + 5등 182,780 = 194,130. */
-	static final double THEORY_AT_LEAST_FIFTH_RATE = 194_130d / 8_145_060d;
+	static final double THEORY_AT_LEAST_FIFTH_RATE = PrizeRank.AT_LEAST_FIFTH_RATE;
 
 	/** 표본 기준은 작성자 판단이다. 5등 이상 기대치가 약 24건이 되는 줄 수다. */
 	static final int SUFFICIENT_LINE_COUNT = 1000;
