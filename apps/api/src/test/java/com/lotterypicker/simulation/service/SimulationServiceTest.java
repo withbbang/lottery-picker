@@ -92,6 +92,35 @@ class SimulationServiceTest {
 	}
 
 	@Test
+	void 한_회차의_전략별_시드는_섞어서_상위_비트까지_다르다() {
+		// given: 섞기 전 시드는 전략 순번만큼 하위 3비트만 다르다
+		List<Long> mixed = new ArrayList<>();
+		for (StrategyType strategy : StrategyType.values()) {
+			mixed.add(SimulationService.mixedSeedFor(SEED, 105, strategy));
+		}
+
+		// then: 상위 32비트가 모두 다르고, 어느 두 시드도 16비트 이상 다르다
+		assertThat(mixed.stream().map(seed -> seed >>> 32).distinct()).hasSize(StrategyType.values().length);
+		for (int i = 0; i < mixed.size(); i++) {
+			for (int j = i + 1; j < mixed.size(); j++) {
+				assertThat(Long.bitCount(mixed.get(i) ^ mixed.get(j))).isGreaterThanOrEqualTo(16);
+			}
+		}
+	}
+
+	@Test
+	void 섞은_시드는_정해진_식의_값을_SplitMix64로_섞은_값이다() {
+		// given
+		long z = SimulationService.seedFor(SEED, 105, StrategyType.CONTROL);
+		z = (z ^ (z >>> 30)) * 0xbf58476d1ce4e5b9L;
+		z = (z ^ (z >>> 27)) * 0x94d049bb133111ebL;
+		z = z ^ (z >>> 31);
+
+		// when / then
+		assertThat(SimulationService.mixedSeedFor(SEED, 105, StrategyType.CONTROL)).isEqualTo(z);
+	}
+
+	@Test
 	void _101회부터_시작한다() {
 		// given
 		givenStoredRounds(history(SEED, 103));
@@ -212,6 +241,7 @@ class SimulationServiceTest {
 		service.refresh();
 
 		// then
+		verify(rounds, never()).findAllByOrderByRoundNoAsc();
 		verify(results, never()).save(any());
 	}
 
@@ -219,22 +249,45 @@ class SimulationServiceTest {
 	void 결과가_없으면_기동_시_계산한다() {
 		// given
 		givenStoredRounds(history(SEED, 101));
-		when(results.existsById(SimulationResult.SINGLE_ROW_ID)).thenReturn(false);
 
 		// when
-		service.refreshIfAbsent();
+		service.refresh();
 
 		// then
 		verify(results).save(any());
 	}
 
 	@Test
-	void 결과가_있으면_기동_시_다시_계산하지_않는다() {
-		// given
-		when(results.existsById(SimulationResult.SINGLE_ROW_ID)).thenReturn(true);
+	void 저장된_결과가_최신_회차보다_뒤처져_있으면_다시_계산한다() {
+		// given: 수집이 1249회를 저장한 뒤 실패해 재계산이 빠졌던 상태
+		givenStoredRounds(history(SEED, 103));
+		givenSavedUpTo(102);
 
 		// when
-		service.refreshIfAbsent();
+		service.refresh();
+
+		// then
+		assertThat(savedResult().getToRound()).isEqualTo(103);
+	}
+
+	@Test
+	void 저장된_결과가_최신_회차까지면_다시_계산하지_않는다() {
+		// given
+		givenStoredRounds(history(SEED, 103));
+		givenSavedUpTo(103);
+
+		// when
+		service.refresh();
+
+		// then: 최신 회차와 결과 회차만 확인하고 계산하지 않는다
+		verify(rounds, never()).findAllByOrderByRoundNoAsc();
+		verify(results, never()).save(any());
+	}
+
+	@Test
+	void 회차가_없으면_계산하지_않는다() {
+		// when
+		service.refresh();
 
 		// then
 		verify(rounds, never()).findAllByOrderByRoundNoAsc();
@@ -249,6 +302,7 @@ class SimulationServiceTest {
 		AtomicInteger concurrent = new AtomicInteger();
 		AtomicInteger maxConcurrent = new AtomicInteger();
 		List<LottoRound> stored = toRounds(history(SEED, 101));
+		when(rounds.findTopByOrderByRoundNoDesc()).thenReturn(Optional.of(stored.get(stored.size() - 1)));
 		AtomicInteger calls = new AtomicInteger();
 		when(rounds.findAllByOrderByRoundNoAsc()).thenAnswer(invocation -> {
 			int now = concurrent.incrementAndGet();
@@ -309,7 +363,16 @@ class SimulationServiceTest {
 	}
 
 	private void givenStoredRounds(DrawHistory history) {
-		when(rounds.findAllByOrderByRoundNoAsc()).thenReturn(toRounds(history));
+		List<LottoRound> stored = toRounds(history);
+		when(rounds.findAllByOrderByRoundNoAsc()).thenReturn(stored);
+		when(rounds.findTopByOrderByRoundNoDesc()).thenReturn(Optional.of(stored.get(stored.size() - 1)));
+	}
+
+	private void givenSavedUpTo(int toRound) {
+		SimulationReport report = new SimulationService(rounds, results, clock).run(history(SEED, toRound), toRound, 1,
+				SEED);
+		when(results.findById(SimulationResult.SINGLE_ROW_ID))
+			.thenReturn(Optional.of(SimulationResult.latest(report, LocalDateTime.parse("2026-11-01T10:00"))));
 	}
 
 	private SimulationResult savedResult() {

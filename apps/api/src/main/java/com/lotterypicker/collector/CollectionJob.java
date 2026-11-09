@@ -86,10 +86,20 @@ public class CollectionJob {
 
 	/**
 	 * 잠금 없이 회차를 수집하고 새 회차와 대기 회차를 처리한다. 호출하는 쪽이 잠금을 잡는다.
-	 * 새 회차를 하나 이상 저장했으면 시뮬레이션 재계산을 한 번만 요청한다. 초기 적재처럼 회차가 많이 들어와도
-	 * 회차마다 다시 계산하지 않기 위해서다. 재계산은 비동기라 수집 잠금을 오래 잡지 않는다.
+	 * 성공하든 실패하든 끝에 시뮬레이션 재계산을 한 번 요청한다. 수집기는 회차를 하나씩 저장하므로 일부를 저장한 뒤
+	 * 실패할 수 있고, 그 회차는 다음 수집에서 누락 회차로 다시 잡히지 않는다. 계산할지는 시뮬레이션이 저장된 결과의 회차와
+	 * 최신 회차를 비교해 정하므로 초기 적재처럼 회차가 많이 들어와도 회차마다 다시 계산하지 않는다.
+	 * 재계산은 비동기라 수집 잠금을 오래 잡지 않는다.
 	 */
 	public void collectRounds() {
+		try {
+			collectAndProcessRounds();
+		} finally {
+			requestSimulation();
+		}
+	}
+
+	private void collectAndProcessRounds() {
 		List<Integer> collected;
 		try {
 			collected = collector.syncMissingRounds();
@@ -107,8 +117,14 @@ public class CollectionJob {
 				log.error("{}회 추첨 후 처리 실패", round, e);
 			}
 		}
-		if (!collected.isEmpty()) {
+	}
+
+	/** 요청이 실패해도 수집 결과에는 영향을 주지 않는다. 다음 수집이나 기동에서 다시 확인한다. */
+	private void requestSimulation() {
+		try {
 			simulation.refresh();
+		} catch (RuntimeException e) {
+			log.error("시뮬레이션 재계산 요청 실패", e);
 		}
 	}
 

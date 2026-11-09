@@ -16,6 +16,7 @@ import com.lotterypicker.recommendation.engine.RecentHotStrategy;
 import com.lotterypicker.recommendation.engine.RecommendationConstraint;
 import com.lotterypicker.recommendation.engine.StrategyType;
 import com.lotterypicker.recommendation.service.DailyRecommendationService;
+import com.lotterypicker.round.entity.LottoRound;
 import com.lotterypicker.round.repository.LottoRoundRepository;
 import com.lotterypicker.simulation.ConfidenceInterval;
 import com.lotterypicker.simulation.SimulationReport;
@@ -78,8 +79,11 @@ public class SimulationService {
 	private final AtomicBoolean pending = new AtomicBoolean();
 
 	/**
-	 * 저장된 전체 회차로 다시 계산해 마지막 결과를 바꾼다. 이미 계산 중이면 새로 돌리지 않고 요청만 남기며,
-	 * 돌고 있던 계산이 끝난 뒤 남은 요청을 한 번 더 계산한다. 그래서 가장 최근 회차가 빠지지 않는다.
+	 * 저장된 결과가 최신 회차를 반영하지 못했으면(결과가 없거나 결과의 끝 회차가 최신 회차와 다르면) 다시 계산해 바꾼다.
+	 * 확인은 최신 회차와 저장된 결과 조회 두 번뿐이라, 수집을 시도할 때마다와 기동 때 불러도 가볍다.
+	 * 수집이 일부 회차를 저장한 뒤 실패해도 다음 호출이 그 회차를 잡는다.
+	 * 이미 계산 중이면 새로 돌리지 않고 요청만 남기며, 돌고 있던 계산이 끝난 뒤 한 번 더 확인한다. 그래서 가장 최근 회차가
+	 * 빠지지 않고, 그 사이 이미 반영됐으면 다시 계산하지 않는다.
 	 */
 	@Async
 	public void refresh() {
@@ -87,7 +91,9 @@ public class SimulationService {
 		while (pending.get() && running.compareAndSet(false, true)) {
 			try {
 				pending.set(false);
-				computeAndSave();
+				if (isStale()) {
+					computeAndSave();
+				}
 			} catch (RuntimeException e) {
 				log.error("시뮬레이션 계산 실패", e);
 			} finally {
@@ -96,11 +102,14 @@ public class SimulationService {
 		}
 	}
 
-	/** 기동 시 확인용. 저장된 결과가 없을 때만 계산한다. 호출한 스레드에서 돈다. */
-	public void refreshIfAbsent() {
-		if (!results.existsById(SimulationResult.SINGLE_ROW_ID)) {
-			refresh();
+	private boolean isStale() {
+		Optional<Integer> latest = rounds.findTopByOrderByRoundNoDesc().map(LottoRound::getRoundNo);
+		if (latest.isEmpty() || latest.get() < START_ROUND) {
+			return false;
 		}
+		return results.findById(SimulationResult.SINGLE_ROW_ID)
+			.map(saved -> saved.getToRound() != latest.get())
+			.orElse(true);
 	}
 
 	public Optional<SimulationResponse> findLatest() {
@@ -165,10 +174,21 @@ public class SimulationService {
 		return baseSeed ^ (round * 1_000_003L) ^ type.ordinal();
 	}
 
+	/**
+	 * {@link #seedFor} 값을 SplitMix64 마무리 함수로 섞는다. 섞기 전 시드는 한 회차 안에서 전략 순번만큼 하위 비트만 달라
+	 * {@link Random}의 첫 출력들이 서로 닮는다. 섞으면 전략별 줄이 서로 독립에 가까워지고, 같은 입력이면 결과는 같다.
+	 */
+	static long mixedSeedFor(long baseSeed, int round, StrategyType type) {
+		long z = seedFor(baseSeed, round, type);
+		z = (z ^ (z >>> 30)) * 0xbf58476d1ce4e5b9L;
+		z = (z ^ (z >>> 27)) * 0x94d049bb133111ebL;
+		return z ^ (z >>> 31);
+	}
+
 	private static List<LottoNumbers> draw(NumberStatistics stats, int round, StrategyType type, int repetitions,
 			long baseSeed) {
 		LineStrategy strategy = STRATEGIES.get(type);
-		Random random = new Random(seedFor(baseSeed, round, type));
+		Random random = new Random(mixedSeedFor(baseSeed, round, type));
 		List<LottoNumbers> lines = new ArrayList<>(repetitions);
 		for (int i = 0; i < repetitions; i++) {
 			lines.add(strategy.draw(stats, RecommendationConstraint.NONE, random).numbers());

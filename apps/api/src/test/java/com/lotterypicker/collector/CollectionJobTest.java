@@ -153,22 +153,47 @@ class CollectionJobTest {
 		// when
 		jobAt("2026-11-14T21:00").collectRounds();
 
-		// then: 시뮬레이션은 회차 처리 뒤 한 번만 요청한다
+		// then: 회차 처리 뒤 한 번만 요청한다. 실제 계산 여부는 저장된 결과의 회차로 시뮬레이션이 정한다
 		InOrder order = inOrder(postDraw, simulation);
 		order.verify(postDraw).process(1250);
 		order.verify(simulation, times(1)).refresh();
 	}
 
 	@Test
-	void 새_회차가_없으면_다시_계산하지_않는다() {
-		// given: 채점 대기 회차만 있다
-		when(postDraw.pendingRounds()).thenReturn(List.of(1247));
+	void 일부_회차를_저장한_뒤_수집이_실패해도_재계산을_요청한다() {
+		// given: 수집기는 회차를 하나씩 저장하므로 1249회를 저장한 뒤 1250회에서 실패할 수 있다
+		CollectorException failure = new CollectorException("1250회 형식 오류");
+		when(collector.syncMissingRounds()).thenThrow(failure);
 
 		// when
-		jobAt("2026-11-13T12:00").collectRounds();
+		assertThatThrownBy(jobAt("2026-11-14T21:00")::collectRounds).isSameAs(failure);
 
 		// then
-		verify(simulation, never()).refresh();
+		verify(simulation).refresh();
+	}
+
+	@Test
+	void 회차_처리가_실패해도_재계산을_요청한다() {
+		// given
+		when(collector.syncMissingRounds()).thenReturn(List.of(1249));
+		doThrow(new IllegalStateException("db")).when(postDraw).process(1249);
+
+		// when
+		jobAt("2026-11-14T21:00").collectRounds();
+
+		// then
+		verify(simulation).refresh();
+	}
+
+	@Test
+	void 재계산_요청이_실패해도_수집_결과에는_영향이_없다() {
+		// given
+		when(collector.syncMissingRounds()).thenReturn(List.of(1249));
+		doThrow(new IllegalStateException("executor")).when(simulation).refresh();
+
+		// when, then
+		assertThatCode(jobAt("2026-11-14T21:00")::collectRounds).doesNotThrowAnyException();
+		verify(postDraw).process(1249);
 	}
 
 	@Test

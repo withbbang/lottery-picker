@@ -68,14 +68,14 @@ class CollectorStartupTest {
 	}
 
 	@Test
-	void 기동_시_시뮬레이션_결과가_없으면_계산을_요청한다() {
+	void 기동_시_시뮬레이션_재계산_여부를_확인한다() {
 		// when
 		startup.collectOnStartup();
 
 		// then: 회차 적재 뒤에 확인해 적재한 회차로 계산한다
 		InOrder order = inOrder(collection, simulation);
 		order.verify(collection).collectRounds();
-		order.verify(simulation).refreshIfAbsent();
+		order.verify(simulation).refresh();
 	}
 
 	@Test
@@ -84,7 +84,7 @@ class CollectorStartupTest {
 		lock.tryRun("5분 확인", startup::collectOnStartup);
 
 		// then
-		verify(simulation).refreshIfAbsent();
+		verify(simulation).refresh();
 	}
 
 	@Test
@@ -96,7 +96,7 @@ class CollectorStartupTest {
 		startup.collectOnStartup();
 
 		// then
-		verify(simulation).refreshIfAbsent();
+		verify(simulation).refresh();
 	}
 
 }
