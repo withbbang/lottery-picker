@@ -3,7 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
-import { PERFORMANCE_LABELS } from "@/components/performance/PerformanceTable";
+import {
+  PERFORMANCE_LABELS,
+  RANKS,
+} from "@/components/performance/PerformanceTable";
 import type { SimulationResponse } from "@/types/api/simulation";
 
 function percent(rate: number) {
@@ -79,6 +82,12 @@ export function SimulationPanel() {
                   <span>{PERFORMANCE_LABELS[s.strategy]}</span>
                   <span className="block text-xs opacity-70">
                     {s.lineCount.toLocaleString("ko-KR")}줄
+                  </span>
+                  <span className="block text-xs opacity-70">
+                    {RANKS.map(
+                      ([rank, label]) =>
+                        `${label} ${s.rankCounts[rank].toLocaleString("ko-KR")}`,
+                    ).join(" · ")}
                   </span>
                 </th>
                 <td>{s.averageMatches.toFixed(3)}</td>

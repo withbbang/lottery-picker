@@ -107,6 +107,26 @@ describe("SimulationPanel", () => {
     expect(screen.getAllByText("유의한 차이 없음")).toHaveLength(1);
   });
 
+  it("shows the rank distribution for each strategy", async () => {
+    // when
+    renderPanel([
+      row({}),
+      row({
+        strategy: "CONTROL",
+        rankCounts: { FIRST: 1, SECOND: 2, THIRD: 40, FOURTH: 290, FIFTH: 5120, NONE: 224347 },
+      }),
+    ]);
+
+    // then
+    const control = (await screen.findByText("대조군")).closest("tr");
+    expect(control).not.toBeNull();
+    expect(
+      within(control as HTMLElement).getByText(
+        "1등 1 · 2등 2 · 3등 40 · 4등 290 · 5등 5,120",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("states that only the number selection rules are evaluated", async () => {
     // when
     renderPanel([row({}), row({ strategy: "CONTROL" })]);

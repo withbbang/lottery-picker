@@ -19,7 +19,8 @@ export const PERFORMANCE_LABELS: Record<
   CONTROL: "대조군",
 };
 
-const RANKS: [PrizeRank, string][] = [
+/** 등수 분포 표시 순서와 이름. 시뮬레이션 패널도 같이 쓴다. */
+export const RANKS: [PrizeRank, string][] = [
   ["FIRST", "1등"],
   ["SECOND", "2등"],
   ["THIRD", "3등"],
