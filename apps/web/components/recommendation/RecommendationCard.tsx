@@ -9,7 +9,7 @@ import type {
   StrategyType,
 } from "@/types/api/recommendation";
 
-const STRATEGY_LABELS: Record<StrategyType, string> = {
+export const STRATEGY_LABELS: Record<StrategyType, string> = {
   RECENT_HOT: "최근 빈도",
   LONG_COLD: "장기 미출현",
   ALL_TIME: "전체 빈도",

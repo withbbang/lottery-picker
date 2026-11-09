@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import { LottoBall } from "@/components/lotto/LottoBall";
+import { RoundResults } from "@/components/results/RoundResults";
 import { WinningStores } from "@/components/rounds/WinningStores";
 import type {
   RoundDetailResponse,
@@ -18,7 +19,9 @@ export function RoundDetail({ round }: { round: number }) {
   const stores = useQuery({
     queryKey: ["rounds", round, "stores"],
     queryFn: () =>
-      apiFetch<WinningStoreResponse[]>(`/api/v1/rounds/${round}/winning-stores`),
+      apiFetch<WinningStoreResponse[]>(
+        `/api/v1/rounds/${round}/winning-stores`,
+      ),
   });
 
   if (detail.isPending) {
@@ -81,6 +84,11 @@ export function RoundDetail({ round }: { round: number }) {
             ))}
           </tbody>
         </table>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold">추천 비교</h2>
+        <RoundResults round={data.round} />
       </section>
 
       <section className="flex flex-col gap-2">

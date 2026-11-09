@@ -148,7 +148,8 @@ class DailyRecommendationRepositoryTest {
 			.toList();
 
 		// then
-		assertThat(names).containsExactlyInAnyOrder("saveAll", "existsByDate", "findByDateOrderByLineIndexAsc");
+		assertThat(names).containsExactlyInAnyOrder("saveAll", "existsByDate", "findByDateOrderByLineIndexAsc",
+				"findByRoundNoOrderByDateAscLineIndexAsc");
 	}
 
 }

@@ -1,0 +1,119 @@
+package com.lotterypicker.result.service;
+
+import com.lotterypicker.collector.PollPolicy;
+import com.lotterypicker.lotto.LottoNumbers;
+import com.lotterypicker.lotto.PrizeRank;
+import com.lotterypicker.notification.MessageFormatter;
+import com.lotterypicker.notification.NotificationKind;
+import com.lotterypicker.notification.service.NotificationService;
+import com.lotterypicker.recommendation.entity.DailyRecommendation;
+import com.lotterypicker.recommendation.repository.DailyRecommendationRepository;
+import com.lotterypicker.result.DrawSummary;
+import com.lotterypicker.result.ResultTally;
+import com.lotterypicker.result.entity.RecommendationResult;
+import com.lotterypicker.result.repository.RecommendationResultRepository;
+import com.lotterypicker.round.entity.LottoRound;
+import com.lotterypicker.round.repository.LottoRoundRepository;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+/**
+ * 당첨번호가 저장된 회차의 추천과 대조군을 채점하고 추첨 종료 알림을 한 번 보낸다.
+ * 알림 재시도 대기 동안 DB 연결을 잡지 않도록 클래스에 트랜잭션을 걸지 않는다. 채점 저장은 saveAll 한 번이라 원자적이다.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class PostDrawService {
+
+	/** 추천이 없는 회차는 추첨일로부터 이 일수 안일 때만 알린다. 초기 적재한 지난 회차는 알리지 않는다. */
+	private static final int NOTIFY_WITHOUT_RECOMMENDATION_DAYS = 7;
+
+	private final LottoRoundRepository rounds;
+	private final DailyRecommendationRepository recommendations;
+	private final RecommendationResultRepository results;
+	private final NotificationService notifications;
+	private final Clock clock;
+
+	/** 당첨번호는 저장됐는데 채점하지 않은 추천이 있는 회차, 오름차순. */
+	public List<Integer> pendingRounds() {
+		return results.findPendingRoundNos();
+	}
+
+	/** 멱등이다. 당첨번호가 없는 회차는 아무것도 만들지 않는다. 없는 결과를 낙첨으로 만들지 않기 위해서다. */
+	public void process(int round) {
+		Optional<LottoRound> stored = rounds.findById(round);
+		if (stored.isEmpty()) {
+			log.warn("{}회 당첨번호가 없어 채점하지 않습니다.", round);
+			return;
+		}
+		LottoRound drawn = stored.get();
+		List<DailyRecommendation> lines = recommendations.findByRoundNoOrderByDateAscLineIndexAsc(round);
+		List<RecommendationResult> scored = score(drawn, lines);
+
+		if (shouldNotify(drawn, !lines.isEmpty(), LocalDate.now(clock))) {
+			notifications.sendOnce(NotificationKind.DRAW_FINISHED, String.valueOf(round),
+					MessageFormatter.drawFinished(summarize(drawn, lines, scored)));
+		}
+	}
+
+	public static boolean shouldNotify(LottoRound round, boolean hasRecommendations, LocalDate today) {
+		if (hasRecommendations) {
+			return true;
+		}
+		return ChronoUnit.DAYS.between(round.getDrawDate(), today) <= NOTIFY_WITHOUT_RECOMMENDATION_DAYS;
+	}
+
+	/** 아직 채점하지 않은 줄만 채점해 저장하고, 그 회차의 결과 전체를 돌려준다. */
+	private List<RecommendationResult> score(LottoRound drawn, List<DailyRecommendation> lines) {
+		List<RecommendationResult> existing = results.findByRoundNo(drawn.getRoundNo());
+		Set<Long> done = existing.stream().map(RecommendationResult::getRecommendationId).collect(Collectors.toSet());
+		LottoNumbers winning = drawn.numbers();
+		LocalDateTime now = LocalDateTime.now(clock);
+		List<RecommendationResult> fresh = lines.stream()
+			.filter(line -> !done.contains(line.getId()))
+			.map(line -> {
+				PrizeRank rank = PrizeRank.of(line.numbers(), winning, drawn.getBonus());
+				return RecommendationResult.builder()
+					.recommendationId(line.getId())
+					.roundNo(drawn.getRoundNo())
+					.matchCount(line.numbers().countMatches(winning))
+					.prizeRank(rank)
+					.prizeAmount(drawn.amountFor(rank))
+					.createdAt(now)
+					.build();
+			})
+			.toList();
+		if (fresh.isEmpty()) {
+			return existing;
+		}
+		List<RecommendationResult> saved = results.saveAll(fresh);
+		return Stream.concat(existing.stream(), saved.stream()).toList();
+	}
+
+	private static DrawSummary summarize(LottoRound drawn, List<DailyRecommendation> lines,
+			List<RecommendationResult> scored) {
+		Set<Long> recommended = lines.stream()
+			.filter(line -> !line.isControl())
+			.map(DailyRecommendation::getId)
+			.collect(Collectors.toSet());
+		ResultTally tally = ResultTally.of(scored.stream()
+			.filter(result -> recommended.contains(result.getRecommendationId()))
+			.toList());
+		LocalDateTime fetchedAt = drawn.getFetchedAt();
+		boolean late = fetchedAt != null && !fetchedAt.isBefore(PollPolicy.overdueAt(drawn.getDrawDate()));
+		return new DrawSummary(drawn.getRoundNo(), drawn.getDrawDate(), drawn.numbers(), drawn.getBonus(),
+				late ? fetchedAt : null, tally);
+	}
+
+}

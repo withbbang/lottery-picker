@@ -25,7 +25,11 @@ const detail: RoundDetailResponse = {
   ],
 };
 
-function store(rank: number, region: string, name: string): WinningStoreResponse {
+function store(
+  rank: number,
+  region: string,
+  name: string,
+): WinningStoreResponse {
   return {
     rank,
     region,
@@ -44,6 +48,23 @@ function mockApi(stores: WinningStoreResponse[], round: unknown = detail) {
   fetchMock.mockImplementation(async (path: string) => {
     if (path.endsWith("/winning-stores")) {
       return ok(stores);
+    }
+    if (path.endsWith("/results")) {
+      return ok({
+        round: 1248,
+        lines: [],
+        rankCounts: {
+          FIRST: 0,
+          SECOND: 0,
+          THIRD: 0,
+          FOURTH: 0,
+          FIFTH: 0,
+          NONE: 0,
+        },
+        prizeTotal: 0,
+        cost: 0,
+        profit: 0,
+      });
     }
     if (round === null) {
       return new Response(
@@ -131,6 +152,22 @@ describe("RoundDetail", () => {
     // then
     expect(
       await screen.findByText("3~5등은 지역 정보가 제공되지 않습니다."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the recommendation comparison section", async () => {
+    // given
+    mockApi([]);
+
+    // when
+    renderDetail();
+
+    // then
+    expect(
+      await screen.findByRole("heading", { name: "추천 비교" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("이 회차 추천이 없습니다."),
     ).toBeInTheDocument();
   });
 

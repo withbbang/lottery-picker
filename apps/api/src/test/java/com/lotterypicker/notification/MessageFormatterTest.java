@@ -3,13 +3,19 @@ package com.lotterypicker.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.lotterypicker.lotto.LottoNumbers;
+import com.lotterypicker.lotto.PrizeRank;
 import com.lotterypicker.recommendation.RecommendationSet;
 import com.lotterypicker.recommendation.StoredLine;
 import com.lotterypicker.recommendation.engine.Relaxation;
 import com.lotterypicker.recommendation.engine.StrategyType;
+import com.lotterypicker.result.DrawSummary;
+import com.lotterypicker.result.ResultTally;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class MessageFormatterTest {
@@ -68,6 +74,87 @@ class MessageFormatterTest {
 
 		// then
 		assertThat(text).doesNotContain(" 6 · 11 · 19 · 27 · 38 · 44", "대조군");
+	}
+
+	private static DrawSummary summary(LocalDateTime lateCollectedAt, ResultTally tally) {
+		return new DrawSummary(1249, LocalDate.of(2026, 11, 7), new LottoNumbers(List.of(3, 11, 19, 27, 38, 44)), 7,
+				lateCollectedAt, tally);
+	}
+
+	private static ResultTally tally() {
+		Map<PrizeRank, Integer> counts = new EnumMap<>(PrizeRank.class);
+		counts.put(PrizeRank.FOURTH, 1);
+		counts.put(PrizeRank.FIFTH, 3);
+		counts.put(PrizeRank.NONE, 31);
+		return new ResultTally(35, counts, 65_000);
+	}
+
+	@Test
+	void 추첨_종료_알림은_당첨번호와_등수별_줄_수와_가상_금액을_보낸다() {
+		// when
+		String text = MessageFormatter.drawFinished(summary(null, tally()));
+
+		// then
+		assertThat(text).isEqualTo("""
+				1249회 추첨 결과 · 2026-11-07(토)
+
+				<pre> 3 · 11 · 19 · 27 · 38 · 44 + 7</pre>
+
+				추천 35줄 · 최고 4등
+				1등 0 · 2등 0 · 3등 0 · 4등 1 · 5등 3 · 낙첨 31
+				가상 당첨금 65,000원 (구매했다고 가정)
+				가상 수익 +30,000원 (줄당 1,000원, 35,000원 구매 가정)
+
+				실제 당첨 확률과 무관합니다.""");
+	}
+
+	@Test
+	void 늦게_수집한_회차는_수집_시각을_적는다() {
+		// when
+		String text = MessageFormatter.drawFinished(summary(LocalDateTime.of(2026, 11, 8, 13, 0), tally()));
+
+		// then
+		assertThat(text).startsWith("""
+				1249회 추첨 결과 · 2026-11-07(토)
+				당첨번호를 늦게 수집했습니다(2026-11-08 13:00).
+
+				<pre>""");
+	}
+
+	@Test
+	void 추천이_없는_회차는_추천_없음만_적는다() {
+		// when
+		String text = MessageFormatter.drawFinished(summary(null, new ResultTally(0, Map.of(), 0)));
+
+		// then
+		assertThat(text).isEqualTo("""
+				1249회 추첨 결과 · 2026-11-07(토)
+
+				<pre> 3 · 11 · 19 · 27 · 38 · 44 + 7</pre>
+
+				이 회차 추천이 없습니다.""");
+	}
+
+	@Test
+	void 수집_지연_알림은_계속_확인한다고_적는다() {
+		// when
+		String text = MessageFormatter.collectionFailed(LocalDate.of(2026, 11, 7));
+
+		// then
+		assertThat(text).isEqualTo("""
+				2026-11-07(토) 추첨 당첨번호를 아직 수집하지 못했습니다.
+				수집될 때까지 1시간마다 계속 확인합니다.""");
+	}
+
+	@Test
+	void 수집_오류_알림은_잘못된_값을_저장하지_않았다고_적는다() {
+		// when
+		String text = MessageFormatter.collectionError(LocalDate.of(2026, 11, 7));
+
+		// then
+		assertThat(text).isEqualTo("""
+				2026-11-07(토) 추첨 회차 수집 중 오류가 났습니다.
+				잘못된 값은 저장하지 않았습니다. 서버 로그를 확인해 주세요.""");
 	}
 
 	@Test

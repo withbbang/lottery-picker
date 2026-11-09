@@ -1,6 +1,7 @@
 package com.lotterypicker.round.entity;
 
 import com.lotterypicker.lotto.LottoNumbers;
+import com.lotterypicker.lotto.PrizeRank;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -104,6 +105,18 @@ public class LottoRound {
 
 	public LottoNumbers numbers() {
 		return new LottoNumbers(List.of(n1, n2, n3, n4, n5, n6));
+	}
+
+	/** 등수의 1인당 금액. 낙첨은 0. */
+	public long amountFor(PrizeRank rank) {
+		return switch (rank) {
+			case FIRST -> rank1Amount;
+			case SECOND -> rank2Amount;
+			case THIRD -> rank3Amount;
+			case FOURTH -> rank4Amount;
+			case FIFTH -> rank5Amount;
+			case NONE -> 0;
+		};
 	}
 
 }
