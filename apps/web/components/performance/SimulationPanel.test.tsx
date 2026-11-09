@@ -136,6 +136,16 @@ describe("SimulationPanel", () => {
     expect(screen.getByText(/실제 당첨 확률과 무관합니다\./)).toBeInTheDocument();
   });
 
+  it("states that the interval is computed per round", async () => {
+    // when
+    renderPanel([row({}), row({ strategy: "CONTROL" })]);
+
+    // then
+    expect(
+      await screen.findByText(/95% 구간은 회차 단위로 계산합니다/),
+    ).toBeInTheDocument();
+  });
+
   it("says the result is not ready when there is none", async () => {
     // when
     renderPanel(null);

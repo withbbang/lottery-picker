@@ -58,6 +58,9 @@ public class SimulationService {
 
 	public static final int REPETITIONS = 200;
 
+	/** 신뢰구간 계산 방식 버전. 1: 줄 단위 이항 근사, 2: 회차 단위(군집) 분산. 바꾸면 저장된 결과를 다시 계산한다. */
+	public static final int METHOD_VERSION = 2;
+
 	public static final long BASE_SEED = 20_261_106L;
 
 	public static final String SCOPE_NOTE = "전략의 번호 추출 규칙만 평가합니다. 고정·제외 번호와 인기 조합·중복 제약은 적용하지 않습니다.";
@@ -79,7 +82,8 @@ public class SimulationService {
 	private final AtomicBoolean pending = new AtomicBoolean();
 
 	/**
-	 * 저장된 결과가 최신 회차를 반영하지 못했으면(결과가 없거나 결과의 끝 회차가 최신 회차와 다르면) 다시 계산해 바꾼다.
+	 * 저장된 결과가 오래됐으면(결과가 없거나, 끝 회차가 최신 회차와 다르거나, 계산 방식 버전이 {@link #METHOD_VERSION}과
+	 * 다르면) 다시 계산해 바꾼다.
 	 * 확인은 최신 회차와 저장된 결과 조회 두 번뿐이라, 수집을 시도할 때마다와 기동 때 불러도 가볍다.
 	 * 수집이 일부 회차를 저장한 뒤 실패해도 다음 호출이 그 회차를 잡는다.
 	 * 이미 계산 중이면 새로 돌리지 않고 요청만 남기며, 돌고 있던 계산이 끝난 뒤 한 번 더 확인한다. 그래서 가장 최근 회차가
@@ -108,7 +112,7 @@ public class SimulationService {
 			return false;
 		}
 		return results.findById(SimulationResult.SINGLE_ROW_ID)
-			.map(saved -> saved.getToRound() != latest.get())
+			.map(saved -> saved.getToRound() != latest.get() || saved.getMethodVersion() != METHOD_VERSION)
 			.orElse(true);
 	}
 
@@ -127,7 +131,7 @@ public class SimulationService {
 			return;
 		}
 		SimulationReport report = run(history, START_ROUND, REPETITIONS, BASE_SEED);
-		results.save(SimulationResult.latest(report, LocalDateTime.now(clock)));
+		results.save(SimulationResult.latest(report, METHOD_VERSION, LocalDateTime.now(clock)));
 		log.info("시뮬레이션 완료: {}~{}회, {}ms", report.fromRound(), report.toRound(),
 				(System.nanoTime() - started) / 1_000_000);
 	}
@@ -152,6 +156,7 @@ public class SimulationService {
 				for (LottoNumbers line : draw(stats, target.round(), type, repetitions, baseSeed)) {
 					tally.add(line.countMatches(target.numbers()), PrizeRank.of(line, target.numbers(), target.bonus()));
 				}
+				tally.endRound();
 			}
 		}
 
@@ -199,9 +204,13 @@ public class SimulationService {
 	private static final class Tally {
 
 		private final Map<PrizeRank, Long> rankCounts = new EnumMap<>(PrizeRank.class);
+		/** 회차별 적중 수. 구간 계산에만 쓰고 저장하지 않는다. */
+		private final List<ConfidenceInterval.RoundCount> rounds = new ArrayList<>();
 		private long lines;
 		private long matches;
 		private long hits;
+		private long roundLines;
+		private long roundHits;
 
 		Tally() {
 			for (PrizeRank rank : PrizeRank.values()) {
@@ -211,15 +220,23 @@ public class SimulationService {
 
 		void add(int matchCount, PrizeRank rank) {
 			lines++;
+			roundLines++;
 			matches += matchCount;
 			rankCounts.merge(rank, 1L, Long::sum);
 			if (rank != PrizeRank.NONE) {
 				hits++;
+				roundHits++;
 			}
 		}
 
+		void endRound() {
+			rounds.add(new ConfidenceInterval.RoundCount(roundHits, roundLines));
+			roundHits = 0;
+			roundLines = 0;
+		}
+
 		ConfidenceInterval interval() {
-			return ConfidenceInterval.normal(hits, lines);
+			return ConfidenceInterval.clustered(rounds);
 		}
 
 		StrategySimulation summarize(StrategyType type, ConfidenceInterval control) {

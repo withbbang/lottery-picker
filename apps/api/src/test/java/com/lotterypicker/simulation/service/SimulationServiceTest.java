@@ -16,6 +16,7 @@ import com.lotterypicker.recommendation.engine.PopularityFilter;
 import com.lotterypicker.recommendation.engine.StrategyType;
 import com.lotterypicker.round.entity.LottoRound;
 import com.lotterypicker.round.repository.LottoRoundRepository;
+import com.lotterypicker.simulation.ConfidenceInterval;
 import com.lotterypicker.simulation.SimulationReport;
 import com.lotterypicker.simulation.StrategySimulation;
 import com.lotterypicker.simulation.entity.SimulationResult;
@@ -172,16 +173,24 @@ class SimulationServiceTest {
 			.orElseThrow();
 		long matches = 0;
 		long hits = 0;
+		List<ConfidenceInterval.RoundCount> perRound = new ArrayList<>();
 		for (HistoricalDraw draw : List.of(target, last)) {
+			long roundHits = 0;
 			for (LottoNumbers line : SimulationService.linesFor(history, draw.round(), StrategyType.CONTROL, 100, SEED)) {
 				matches += line.countMatches(draw.numbers());
 				if (PrizeRank.of(line, draw.numbers(), draw.bonus()) != PrizeRank.NONE) {
-					hits++;
+					roundHits++;
 				}
 			}
+			hits += roundHits;
+			perRound.add(new ConfidenceInterval.RoundCount(roundHits, 100));
 		}
 		assertThat(control.averageMatches()).isEqualTo(matches / 200.0);
 		assertThat(control.atLeastFifthRate()).isEqualTo(hits / 200.0);
+		// 구간은 줄 단위가 아니라 회차별 적중 수로 계산한다
+		ConfidenceInterval expected = ConfidenceInterval.clustered(perRound);
+		assertThat(control.ciLow()).isEqualTo(expected.low());
+		assertThat(control.ciHigh()).isEqualTo(expected.high());
 	}
 
 	@Test
@@ -285,6 +294,22 @@ class SimulationServiceTest {
 	}
 
 	@Test
+	void 계산_방식이_바뀌면_다시_계산한다() {
+		// given: 끝 회차는 최신이지만 옛 계산 방식(1)으로 저장된 결과
+		givenStoredRounds(history(SEED, 103));
+		givenSavedUpTo(103, 1);
+
+		// when
+		service.refresh();
+
+		// then
+		SimulationResult saved = savedResult();
+		assertThat(SimulationService.METHOD_VERSION).isEqualTo(2);
+		assertThat(saved.getMethodVersion()).isEqualTo(SimulationService.METHOD_VERSION);
+		assertThat(saved.getToRound()).isEqualTo(103);
+	}
+
+	@Test
 	void 회차가_없으면_계산하지_않는다() {
 		// when
 		service.refresh();
@@ -369,10 +394,14 @@ class SimulationServiceTest {
 	}
 
 	private void givenSavedUpTo(int toRound) {
+		givenSavedUpTo(toRound, SimulationService.METHOD_VERSION);
+	}
+
+	private void givenSavedUpTo(int toRound, int methodVersion) {
 		SimulationReport report = new SimulationService(rounds, results, clock).run(history(SEED, toRound), toRound, 1,
 				SEED);
-		when(results.findById(SimulationResult.SINGLE_ROW_ID))
-			.thenReturn(Optional.of(SimulationResult.latest(report, LocalDateTime.parse("2026-11-01T10:00"))));
+		when(results.findById(SimulationResult.SINGLE_ROW_ID)).thenReturn(Optional.of(
+				SimulationResult.latest(report, methodVersion, LocalDateTime.parse("2026-11-01T10:00"))));
 	}
 
 	private SimulationResult savedResult() {

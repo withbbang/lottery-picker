@@ -30,11 +30,11 @@ class SimulationResultRepositoryTest {
 	@Test
 	void 다시_저장하면_한_행을_덮어쓴다() {
 		// given
-		repository.saveAndFlush(SimulationResult.latest(report(101, 1200), LocalDateTime.parse("2026-11-08T10:00")));
+		repository.saveAndFlush(SimulationResult.latest(report(101, 1200), 1, LocalDateTime.parse("2026-11-08T10:00")));
 		entityManager.clear();
 
 		// when
-		repository.saveAndFlush(SimulationResult.latest(report(101, 1249), LocalDateTime.parse("2026-11-09T10:00")));
+		repository.saveAndFlush(SimulationResult.latest(report(101, 1249), 2, LocalDateTime.parse("2026-11-09T10:00")));
 		entityManager.clear();
 
 		// then
@@ -42,6 +42,7 @@ class SimulationResultRepositoryTest {
 		SimulationResult stored = repository.findById(SimulationResult.SINGLE_ROW_ID).orElseThrow();
 		assertThat(stored.getToRound()).isEqualTo(1249);
 		assertThat(stored.getComputedAt()).isEqualTo(LocalDateTime.parse("2026-11-09T10:00"));
+		assertThat(stored.getMethodVersion()).isEqualTo(2);
 	}
 
 	@Test
@@ -50,13 +51,29 @@ class SimulationResultRepositoryTest {
 		SimulationReport report = report(101, 1249);
 
 		// when
-		repository.saveAndFlush(SimulationResult.latest(report, LocalDateTime.parse("2026-11-09T10:00")));
+		repository.saveAndFlush(SimulationResult.latest(report, 2, LocalDateTime.parse("2026-11-09T10:00")));
 		entityManager.clear();
 
 		// then
 		SimulationResult stored = repository.findById(SimulationResult.SINGLE_ROW_ID).orElseThrow();
 		assertThat(stored.getStrategies()).isEqualTo(report.strategies());
 		assertThat(stored.getRepetitions()).isEqualTo(200);
+	}
+
+	@Test
+	void 계산_방식_버전이_없던_행은_옛_버전으로_읽는다() {
+		// given: V8 이전에 저장된 행처럼 버전 없이 넣는다
+		entityManager.getEntityManager()
+			.createNativeQuery("insert into simulation_result (id, from_round, to_round, repetitions, strategies, computed_at)"
+					+ " values (1, 101, 1249, 200, '[]', TIMESTAMP '2026-11-08 10:00:00')")
+			.executeUpdate();
+		entityManager.clear();
+
+		// when
+		SimulationResult stored = repository.findById(SimulationResult.SINGLE_ROW_ID).orElseThrow();
+
+		// then
+		assertThat(stored.getMethodVersion()).isEqualTo(1);
 	}
 
 	private static SimulationReport report(int from, int to) {
