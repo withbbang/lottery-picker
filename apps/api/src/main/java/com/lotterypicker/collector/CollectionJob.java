@@ -22,7 +22,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * 새 회차를 확인해 수집하고, 새 회차와 채점 대기 회차를 처리한다. 5분마다 깨지만 {@link PollPolicy}가 정한 시각에만
- * 사이트를 부른다. 06:00에는 판매점을 수집한다. 기동 수집과 같은 {@link CollectionLock}으로 서로 겹치지 않게 한다.
+ * 사이트를 부른다. 06:02에는 판매점을 수집한다. 5분 확인과 같은 순간에 돌면 잠금을 못 잡아 그날 건너뛰므로
+ * 5분 격자를 피한다. 기동 수집과 같은 {@link CollectionLock}으로 서로 겹치지 않게 한다.
  * 수집기 예외는 기대 추첨일을 키로 COLLECTION_ERROR를 알린다. 수집기는 파싱에 성공한 회차만 저장한다.
  */
 @Slf4j
@@ -72,7 +73,7 @@ public class CollectionJob {
 		collectRounds();
 	}
 
-	@Scheduled(cron = "0 0 6 * * *", zone = "Asia/Seoul")
+	@Scheduled(cron = "0 2 6 * * *", zone = "Asia/Seoul")
 	public void syncStoresDaily() {
 		lock.tryRun("판매점 수집", this::collectStores);
 	}
@@ -101,7 +102,7 @@ public class CollectionJob {
 		}
 	}
 
-	/** 수집 범위 밖(기동, 06시) 오류도 주 단위로 한 번만 알리도록 키는 기대 추첨일로 한다. */
+	/** 수집 범위 밖(기동, 06:02 판매점) 오류도 주 단위로 한 번만 알리도록 키는 기대 추첨일로 한다. */
 	private void notifyError(CollectorException cause) {
 		LocalDate expected = rounds.findTopByOrderByRoundNoDesc()
 			.map(round -> round.getDrawDate().plusDays(DAYS_PER_ROUND))

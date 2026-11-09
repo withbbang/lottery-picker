@@ -25,12 +25,14 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.support.CronExpression;
 
 class CollectionJobTest {
 
@@ -210,13 +212,13 @@ class CollectionJobTest {
 		doThrow(failure).when(collector).syncStores();
 
 		// when, then
-		assertThatThrownBy(jobAt("2026-11-09T06:00")::syncStoresDaily).isSameAs(failure);
+		assertThatThrownBy(jobAt("2026-11-09T06:02")::syncStoresDaily).isSameAs(failure);
 		verify(notifications).sendOnce(NotificationKind.COLLECTION_ERROR, "2026-11-07",
 				MessageFormatter.collectionError(EXPECTED_DRAW));
 	}
 
 	@Test
-	void 한국_시각_5분마다_확인하고_6시에_판매점을_수집한다() throws Exception {
+	void 한국_시각_5분마다_확인하고_6시_2분에_판매점을_수집한다() throws Exception {
 		// when
 		Scheduled poll = CollectionJob.class.getMethod("poll").getAnnotation(Scheduled.class);
 		Scheduled stores = CollectionJob.class.getMethod("syncStoresDaily").getAnnotation(Scheduled.class);
@@ -224,8 +226,30 @@ class CollectionJobTest {
 		// then
 		assertThat(poll.cron()).isEqualTo("0 */5 * * * *");
 		assertThat(poll.zone()).isEqualTo("Asia/Seoul");
-		assertThat(stores.cron()).isEqualTo("0 0 6 * * *");
+		assertThat(stores.cron()).isEqualTo("0 2 6 * * *");
 		assertThat(stores.zone()).isEqualTo("Asia/Seoul");
+	}
+
+	@Test
+	void 판매점_수집은_5분_확인과_같은_시각에_돌지_않는다() throws Exception {
+		// given: 둘이 같은 순간에 돌면 잠금을 못 잡은 판매점 수집이 그날 건너뛰어진다
+		CronExpression poll = CronExpression
+			.parse(CollectionJob.class.getMethod("poll").getAnnotation(Scheduled.class).cron());
+		CronExpression stores = CronExpression
+			.parse(CollectionJob.class.getMethod("syncStoresDaily").getAnnotation(Scheduled.class).cron());
+		LocalDateTime start = LocalDateTime.of(2026, 11, 9, 0, 0);
+
+		// when: 하루 동안의 판매점 수집 시각
+		List<LocalDateTime> storeTimes = new ArrayList<>();
+		for (LocalDateTime t = stores.next(start); t != null && t.isBefore(start.plusDays(1)); t = stores.next(t)) {
+			storeTimes.add(t);
+		}
+
+		// then: 판매점 수집 시각 직전 초부터 다음 확인이 그 시각과 겹치지 않는다
+		assertThat(storeTimes).isNotEmpty();
+		for (LocalDateTime t : storeTimes) {
+			assertThat(poll.next(t.minusSeconds(1))).isNotEqualTo(t);
+		}
 	}
 
 }

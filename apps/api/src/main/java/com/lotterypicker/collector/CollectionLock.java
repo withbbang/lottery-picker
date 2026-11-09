@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 기동 수집, 5분 확인, 06시 판매점 수집이 동시에 돌지 않게 하는 프로세스 내 잠금.
+ * 기동 수집, 5분 확인, 06:02 판매점 수집이 동시에 돌지 않게 하는 프로세스 내 잠금.
  * 이미 다른 수집이 돌고 있으면 기다리지 않고 이번 실행을 건너뛴다. 같은 스레드에서도 다시 잡을 수 없다.
  */
 @Slf4j
