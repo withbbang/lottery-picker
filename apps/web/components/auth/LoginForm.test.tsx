@@ -20,7 +20,7 @@ function renderForm() {
     </QueryProvider>,
   );
   return {
-    input: screen.getByRole("textbox", { name: "OTP 코드" }),
+    input: screen.getByRole("textbox", { name: "인증 코드" }),
     submit: screen.getByRole("button", { name: "로그인" }),
   };
 }

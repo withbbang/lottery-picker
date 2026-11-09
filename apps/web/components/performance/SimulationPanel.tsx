@@ -3,14 +3,27 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
+import { PERFORMANCE_LABELS } from "@/components/performance/PerformanceTable";
 import {
-  PERFORMANCE_LABELS,
-  RANKS,
-} from "@/components/performance/PerformanceTable";
+  FifthOrBetter,
+  HEAD_CELL,
+  Legend,
+  NAME_CELL,
+  NUM_CELL,
+  RankBreakdown,
+  SharedFacts,
+  sharedValue,
+  SUB_ROW_CELL,
+  SUB_VALUE,
+} from "@/components/performance/StatTable";
 import type { SimulationResponse } from "@/types/api/simulation";
 
 function percent(rate: number) {
   return `${(rate * 100).toFixed(2)}%`;
+}
+
+function interval(low: number, high: number) {
+  return `${(low * 100).toFixed(2)}~${percent(high)}`;
 }
 
 function formatComputedAt(iso: string) {
@@ -36,84 +49,137 @@ export function SimulationPanel() {
   });
 
   if (isPending) {
-    return <p>시뮬레이션 결과를 불러오는 중…</p>;
+    return <p className="text-muted">시뮬레이션 결과를 불러오는 중…</p>;
   }
   if (isError) {
-    return <p role="alert">시뮬레이션 결과를 불러오지 못했습니다.</p>;
+    return (
+      <p role="alert" className="text-danger">
+        시뮬레이션 결과를 불러오지 못했습니다.
+      </p>
+    );
   }
   if (data === null) {
     return (
-      <p>
-        아직 시뮬레이션 결과가 없습니다. 새 회차를 수집하면 서버가 계산합니다.
+      <p className="text-muted">
+        아직 시뮬레이션 결과가 없습니다. 새 회차를 수집한 뒤 계산합니다.
       </p>
     );
   }
 
+  const theory = percent(data.theoryAtLeastFifthRate);
+  const sharedLines = sharedValue(data.strategies.map((s) => s.lineCount));
+  const sharedInterval = sharedValue(
+    data.strategies.map((s) => interval(s.ciLow, s.ciHigh)),
+  );
+
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm tabular-nums">
-        <span>
-          {data.fromRound}~{data.toRound}회, 회차마다 {data.repetitions}줄
-        </span>
-        <span className="block text-xs opacity-70">
-          계산 {formatComputedAt(data.computedAt)}
-        </span>
-      </p>
-      <p className="text-sm opacity-70">{data.scopeNote}</p>
-      <p className="text-sm opacity-70">
-        각 회차는 그 이전 회차만으로 뽑았습니다. 이론값{" "}
-        {percent(data.theoryAtLeastFifthRate)}는 5등 이상에 해당하는 조합의
-        비율입니다. 실제 당첨 확률과 무관합니다.
-      </p>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5 text-sm text-muted">
+        <p>
+          과거 회차에 전략을 미리 적용해 본 결과입니다.{" "}
+          <span className="tabular-nums">
+            {data.fromRound}~{data.toRound}회의 회차마다
+          </span>{" "}
+          그 회차보다 앞선 당첨번호만 보고 전략별로{" "}
+          <span className="tabular-nums">{data.repetitions}줄</span>씩 고른 뒤,
+          그 회차 당첨번호와 맞춰 봤습니다.
+        </p>
+        <p>
+          아무 번호나 골라도 한 줄이 5등 이상일 확률은 {theory}입니다. 이보다
+          꾸준히 높아야 의미가 있습니다.
+        </p>
+        <p>{data.scopeNote}</p>
+        <p className="text-right text-xs tabular-nums">
+          {formatComputedAt(data.computedAt)} 계산
+        </p>
+      </div>
+      <SharedFacts
+        items={[
+          ...(sharedLines === null
+            ? []
+            : [
+                [
+                  "채점한 줄 수",
+                  `전략마다 ${sharedLines.toLocaleString("ko-KR")}줄`,
+                ] as [string, string],
+              ]),
+          ...(sharedInterval === null
+            ? []
+            : [
+                ["5등↑ 95% 구간", `모두 ${sharedInterval}`] as [string, string],
+              ]),
+        ]}
+      />
       <div className="overflow-x-auto">
         <table className="w-full text-sm tabular-nums">
-          <thead>
-            <tr className="text-left opacity-70">
-              <th scope="col">전략</th>
-              <th scope="col">평균 일치</th>
-              <th scope="col">5등 이상 (95% 구간)</th>
-              <th scope="col">대조군 비교</th>
+          <thead className="text-muted">
+            <tr>
+              <th scope="col" className={HEAD_CELL}>
+                전략
+              </th>
+              <th scope="col" className={HEAD_CELL}>
+                평균
+              </th>
+              <th scope="col" className={HEAD_CELL}>
+                <FifthOrBetter />
+              </th>
+              <th scope="col" className={HEAD_CELL}>
+                대조군 대비
+              </th>
             </tr>
           </thead>
-          <tbody>
-            {data.strategies.map((s) => (
-              <tr key={s.strategy} className="border-t border-current/20 align-top">
-                <th scope="row" className="py-1 text-left font-normal">
-                  <span>{PERFORMANCE_LABELS[s.strategy]}</span>
-                  <span className="block text-xs opacity-70">
-                    {s.lineCount.toLocaleString("ko-KR")}줄
-                  </span>
-                  <span className="block text-xs opacity-70">
-                    {RANKS.map(
-                      ([rank, label]) =>
-                        `${label} ${s.rankCounts[rank].toLocaleString("ko-KR")}`,
-                    ).join(" · ")}
-                  </span>
+          {data.strategies.map((s) => (
+            <tbody key={s.strategy} className="border-t border-rule">
+              <tr>
+                <th scope="row" className={NAME_CELL}>
+                  {PERFORMANCE_LABELS[s.strategy]}
+                  {sharedLines === null && (
+                    <span className={`${SUB_VALUE} tabular-nums`}>
+                      {s.lineCount.toLocaleString("ko-KR")}줄
+                    </span>
+                  )}
                 </th>
-                <td>{s.averageMatches.toFixed(3)}</td>
-                <td>
-                  <span>{percent(s.atLeastFifthRate)}</span>
-                  <span className="block text-xs opacity-70">
-                    {percent(s.ciLow)}~{percent(s.ciHigh)}
-                  </span>
+                <td className={NUM_CELL}>{s.averageMatches.toFixed(3)}</td>
+                <td className={NUM_CELL}>
+                  {percent(s.atLeastFifthRate)}
+                  {sharedInterval === null && (
+                    <span className={SUB_VALUE}>
+                      {interval(s.ciLow, s.ciHigh)}
+                    </span>
+                  )}
                 </td>
-                <td>
+                <td
+                  className={`${NUM_CELL} ${s.differsFromControl ? "font-semibold text-slip" : ""}`}
+                >
                   {s.strategy === "CONTROL"
                     ? "기준"
                     : s.differsFromControl
-                      ? "무작위와 차이 관측"
-                      : "유의한 차이 없음"}
+                      ? "차이 관측"
+                      : "차이 없음"}
                 </td>
               </tr>
-            ))}
-          </tbody>
+              <tr>
+                <td colSpan={4} className={SUB_ROW_CELL}>
+                  <RankBreakdown counts={s.rankCounts} />
+                </td>
+              </tr>
+            </tbody>
+          ))}
         </table>
       </div>
-      <p className="text-xs opacity-70">
-        95% 구간은 회차 단위로 계산합니다(같은 회차의 줄은 함께 채점되므로).
-        구간이 대조군 구간과 겹치면 유의한 차이 없음으로 표시합니다. 여러
-        전략을 동시에 비교한 결과라 차이가 관측되어도 우연일 수 있습니다.
-      </p>
+      <Legend
+        items={[
+          ["평균", "한 줄에서 맞힌 번호 개수의 평균"],
+          [
+            <FifthOrBetter key="fifth" />,
+            "5등 이상 당첨된 줄의 비율. 95% 구간은 회차 단위로 계산한 신뢰구간으로, 우연에 따른 흔들림을 감안한 범위입니다.",
+          ],
+          [
+            "대조군 대비",
+            "무작위로 뽑은 대조군과 95% 구간이 겹치면 차이 없음, 겹치지 않으면 차이 관측입니다. 여러 전략을 동시에 비교했으므로 차이가 관측되어도 우연일 수 있습니다.",
+          ],
+        ]}
+      />
     </div>
   );
 }

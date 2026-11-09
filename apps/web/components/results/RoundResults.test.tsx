@@ -86,16 +86,15 @@ describe("RoundResults", () => {
     );
   });
 
-  it("labels amounts as 구매했다고 가정", async () => {
+  it("labels amounts as 가상 and lists every line without opening anything", async () => {
     // when
     renderResults(scored);
 
     // then
-    expect(
-      await screen.findByText(
-        "구매했다고 가정한 가상 금액입니다. 줄당 1,000원, 3줄 3,000원",
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("가상 당첨금")).toBeInTheDocument();
+    expect(screen.getByText("가상 수익")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /줄별 결과/ })).toBeVisible();
+    expect(screen.getByText("4개 일치")).toBeVisible();
   });
 
   it("shows an empty message without recommendations", async () => {
@@ -119,9 +118,9 @@ describe("RoundResults", () => {
 
     // then
     expect(
-      await screen.findByText("이 회차 추천이 없습니다."),
+      await screen.findByText("이 회차에는 추천한 번호가 없습니다."),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/가상 금액/)).not.toBeInTheDocument();
+    expect(screen.queryByText("가상 당첨금")).not.toBeInTheDocument();
   });
 
   it("shows a neutral message while results are not computed yet", async () => {
@@ -145,10 +144,10 @@ describe("RoundResults", () => {
 
     // then
     expect(
-      await screen.findByText("아직 비교 결과를 계산하지 않았습니다."),
+      await screen.findByText("아직 채점 전입니다."),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText("이 회차 추천이 없습니다."),
+      screen.queryByText("이 회차에는 추천한 번호가 없습니다."),
     ).not.toBeInTheDocument();
   });
 });

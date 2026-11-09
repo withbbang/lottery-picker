@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LatestRoundSummary } from "@/components/recommendation/LatestRoundSummary";
@@ -70,6 +71,45 @@ describe("LatestRoundSummary", () => {
     );
   });
 
+  it("shows the scored results inline when 채점 결과 보기 is clicked", async () => {
+    // given
+    fetchMock.mockImplementation(async (url: string) =>
+      url.endsWith("/results")
+        ? new Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                round: 1248,
+                lines: [],
+                rankCounts: { FIRST: 0, SECOND: 0, THIRD: 0, FOURTH: 0, FIFTH: 0, NONE: 0 },
+                prizeTotal: 0,
+                cost: 0,
+                profit: 0,
+                pending: true,
+              },
+            }),
+          )
+        : page([
+            {
+              round: 1248,
+              numbers: [16, 18, 27, 36, 38, 42],
+              bonus: 22,
+              drawDate: "2026-10-31",
+            },
+          ]),
+    );
+    renderSummary();
+    const toggle = await screen.findByRole("button", { name: /채점 결과 보기/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    // when
+    await userEvent.click(toggle);
+
+    // then
+    expect(await screen.findByText("아직 채점 전입니다.")).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/rounds/1248/results", undefined);
+  });
+
   it("says so when no round is stored", async () => {
     // given
     fetchMock.mockResolvedValue(page([]));
@@ -79,7 +119,7 @@ describe("LatestRoundSummary", () => {
 
     // then
     expect(
-      await screen.findByText("저장된 회차가 없습니다."),
+      await screen.findByText("아직 수집한 회차가 없습니다."),
     ).toBeInTheDocument();
   });
 });

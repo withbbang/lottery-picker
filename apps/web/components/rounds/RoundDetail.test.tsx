@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RoundDetail } from "@/components/rounds/RoundDetail";
@@ -127,7 +126,7 @@ describe("RoundDetail", () => {
 
     // then
     expect(
-      await screen.findByRole("heading", { name: "당첨 판매점 지역" }),
+      await screen.findByRole("heading", { name: "당첨 판매점" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("당첨자 지역")).not.toBeInTheDocument();
   });
@@ -140,7 +139,7 @@ describe("RoundDetail", () => {
     renderDetail(1);
 
     // then
-    expect(await screen.findByText("지역 정보 없음")).toBeInTheDocument();
+    expect(await screen.findByText("판매점 정보가 없습니다.")).toBeInTheDocument();
   });
 
   it("states that ranks 3 to 5 have no region data", async () => {
@@ -152,7 +151,7 @@ describe("RoundDetail", () => {
 
     // then
     expect(
-      await screen.findByText("3~5등은 지역 정보가 제공되지 않습니다."),
+      await screen.findByText("3~5등은 판매점 정보가 공개되지 않습니다."),
     ).toBeInTheDocument();
   });
 
@@ -165,10 +164,10 @@ describe("RoundDetail", () => {
 
     // then
     expect(
-      await screen.findByRole("heading", { name: "추천 비교" }),
+      await screen.findByRole("heading", { name: "추천 채점" }),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("이 회차 추천이 없습니다."),
+      await screen.findByText("이 회차에는 추천한 번호가 없습니다."),
     ).toBeInTheDocument();
   });
 
@@ -197,22 +196,21 @@ describe("RoundDetail", () => {
     renderDetail();
 
     // then
-    const online = (await screen.findByText("온라인")).closest("summary")!;
+    const online = await screen.findByRole("listitem", { name: "온라인" });
     expect(within(online).getByText("2건")).toBeInTheDocument();
-    const seoul = screen.getByText("서울").closest("summary")!;
+    const seoul = screen.getByRole("listitem", { name: "서울" });
     expect(within(seoul).getByText("1건")).toBeInTheDocument();
   });
 
-  it("reveals the store list when a region group is opened", async () => {
+  it("shows each region's stores without opening anything", async () => {
     // given
     mockApi([store(1, "부산", "가게B")]);
-    renderDetail();
-    const summary = (await screen.findByText("부산")).closest("summary")!;
 
     // when
-    await userEvent.click(summary);
+    renderDetail();
 
     // then
-    expect(screen.getByText("가게B")).toBeVisible();
+    const busan = await screen.findByRole("listitem", { name: "부산" });
+    expect(within(busan).getByText("가게B")).toBeVisible();
   });
 });

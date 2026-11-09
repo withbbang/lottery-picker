@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -13,6 +13,8 @@ import type {
 const SETTINGS_PATH = "/api/v1/recommendation-settings";
 const SETTINGS_KEY = ["recommendation-settings"];
 const FALLBACK_ERROR = "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+const INPUT_CLASS =
+  "rounded-md border border-rule bg-surface px-3 py-2.5 tabular-nums placeholder:text-muted/70";
 const INVALID_INPUT = "번호는 쉼표나 공백으로 구분한 숫자로 입력해 주세요.";
 
 function formatNumbers(numbers: number[]): string {
@@ -44,11 +46,15 @@ export function SettingsForm() {
   });
 
   if (isPending) {
-    return <p>설정을 불러오는 중…</p>;
+    return <p className="text-muted">설정을 불러오는 중…</p>;
   }
   // 백그라운드 재조회 실패는 데이터가 남아 있다. 폼을 내리면 입력 중인 값이 사라진다.
   if (!data) {
-    return <p role="alert">설정을 불러오지 못했습니다.</p>;
+    return (
+      <p role="alert" className="text-danger">
+        설정을 불러오지 못했습니다. 잠시 후 새로고침해 주세요.
+      </p>
+    );
   }
   return <SettingsFields initial={data} />;
 }
@@ -59,6 +65,8 @@ function SettingsFields({
   initial: RecommendationSettingsResponse;
 }) {
   const queryClient = useQueryClient();
+  const fixedHint = useId();
+  const excludedHint = useId();
   const [fixed, setFixed] = useState(formatNumbers(initial.fixed));
   const [excluded, setExcluded] = useState(formatNumbers(initial.excluded));
   const [inputError, setInputError] = useState<string | null>(null);
@@ -98,50 +106,75 @@ function SettingsFields({
       : null);
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-2">
-        <span className="font-medium">고정 번호</span>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <label htmlFor={`${fixedHint}-input`} className="font-semibold">
+          고정 번호
+        </label>
+        <p id={fixedHint} className="text-sm text-muted">
+          모든 줄에 넣을 번호입니다. 5개까지 지정할 수 있습니다.
+        </p>
         <input
+          id={`${fixedHint}-input`}
           type="text"
+          inputMode="numeric"
+          aria-describedby={fixedHint}
+          placeholder="예: 7, 23"
           value={fixed}
           onChange={(event) => {
             setFixed(event.target.value);
             clearMessages();
           }}
-          className="rounded-md border border-current/40 bg-transparent px-3 py-2 tabular-nums"
+          className={INPUT_CLASS}
         />
-      </label>
-      <label className="flex flex-col gap-2">
-        <span className="font-medium">제외 번호</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        <label htmlFor={`${excludedHint}-input`} className="font-semibold">
+          제외 번호
+        </label>
+        <p id={excludedHint} className="text-sm text-muted">
+          추천에서 제외할 번호입니다.
+        </p>
         <input
+          id={`${excludedHint}-input`}
           type="text"
+          inputMode="numeric"
+          aria-describedby={excludedHint}
+          placeholder="예: 1, 45"
           value={excluded}
           onChange={(event) => {
             setExcluded(event.target.value);
             clearMessages();
           }}
-          className="rounded-md border border-current/40 bg-transparent px-3 py-2 tabular-nums"
+          className={INPUT_CLASS}
         />
-      </label>
-      <p className="text-sm opacity-70">
-        쉼표나 공백으로 구분합니다. 고정 번호는 5개까지 지정할 수 있습니다.
-      </p>
-      <p className="text-sm font-medium">
-        변경 내용은 다음 추천 생성부터 적용됩니다.
+      </div>
+      <p className="text-sm text-muted">
+        번호는 쉼표나 공백으로 구분합니다. 바꾼 설정은 다음 추천부터 적용됩니다.{" "}
+        <span className="whitespace-nowrap">
+          (예시:{" "}
+          <span className="font-medium text-ink tabular-nums">3, 17, 42</span>{" "}
+          또는{" "}
+          <span className="font-medium text-ink tabular-nums">3 17 42</span>)
+        </span>
       </p>
       <button
         type="submit"
         disabled={save.isPending}
-        className="rounded-md border border-current px-4 py-2 font-medium disabled:opacity-50"
+        className="rounded-md bg-slip px-4 py-2.5 font-semibold text-on-slip hover:bg-slip/90 disabled:opacity-40"
       >
-        저장
+        {save.isPending ? "저장하는 중…" : "설정 저장"}
       </button>
       {errorMessage !== null && (
-        <p role="alert" className="text-red-700 dark:text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {errorMessage}
         </p>
       )}
-      {save.isSuccess && <p role="status">저장했습니다.</p>}
+      {save.isSuccess && (
+        <p role="status" className="text-sm font-medium text-slip">
+          설정을 저장했습니다.
+        </p>
+      )}
     </form>
   );
 }

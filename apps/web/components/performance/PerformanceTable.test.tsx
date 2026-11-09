@@ -17,7 +17,14 @@ function row(
     strategy: "RECENT_HOT",
     lineCount: 1000,
     averageMatches: 0.75,
-    rankCounts: { FIRST: 0, SECOND: 0, THIRD: 1, FOURTH: 20, FIFTH: 30, NONE: 949 },
+    rankCounts: {
+      FIRST: 0,
+      SECOND: 0,
+      THIRD: 1,
+      FOURTH: 20,
+      FIFTH: 30,
+      NONE: 949,
+    },
     atLeastFifthRate: 0.051,
     noSettingsLineCount: 900,
     noSettingsAtLeastFifthRate: 0.0256,
@@ -59,7 +66,7 @@ describe("PerformanceTable", () => {
     renderTable([row({}), row({ strategy: "CONTROL", lineCount: 1200 })]);
 
     // then
-    expect(await screen.findByText("대조군")).toBeInTheDocument();
+    expect(await screen.findByText("무작위 대조군")).toBeInTheDocument();
     expect(screen.getByText("최근 빈도")).toBeInTheDocument();
     expect(screen.getByText("1,200줄")).toBeInTheDocument();
   });
@@ -70,7 +77,7 @@ describe("PerformanceTable", () => {
 
     // then
     expect(
-      await screen.findByText(/아직 차이를 판단하기 이르다/),
+      await screen.findByText(/아직 차이를 판단하기 이릅니다/),
     ).toBeInTheDocument();
   });
 
@@ -81,7 +88,7 @@ describe("PerformanceTable", () => {
     // then
     await screen.findByText("최근 빈도");
     expect(
-      screen.queryByText(/아직 차이를 판단하기 이르다/),
+      screen.queryByText(/아직 차이를 판단하기 이릅니다/),
     ).not.toBeInTheDocument();
   });
 
@@ -90,9 +97,11 @@ describe("PerformanceTable", () => {
     renderTable([row({})]);
 
     // then
-    expect(await screen.findByText(/이론값 2\.38%/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/5등 이상일 확률은 2\.38%라서/),
+    ).toBeInTheDocument();
     expect(screen.getByText("2.56%")).toBeInTheDocument();
-    expect(screen.getByText("설정 없는 900줄")).toBeInTheDocument();
+    expect(screen.getByText("전략마다 900줄")).toBeInTheDocument();
   });
 
   it("shows dashes instead of rates when there are no lines", async () => {
@@ -109,7 +118,20 @@ describe("PerformanceTable", () => {
     ]);
 
     // then
-    expect(await screen.findByText("설정 없는 0줄")).toBeInTheDocument();
+    expect(await screen.findByText("전략마다 0줄")).toBeInTheDocument();
     expect(screen.getAllByText("-").length).toBeGreaterThan(0);
+  });
+
+  it("shows each no-settings line count in its row when they differ", async () => {
+    // when
+    renderTable([
+      row({}),
+      row({ strategy: "CONTROL", noSettingsLineCount: 1200 }),
+    ]);
+
+    // then
+    expect(await screen.findByText("900줄 기준")).toBeInTheDocument();
+    expect(screen.getByText("1,200줄 기준")).toBeInTheDocument();
+    expect(screen.queryByText(/^전략마다/)).not.toBeInTheDocument();
   });
 });

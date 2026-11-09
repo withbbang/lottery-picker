@@ -1,23 +1,84 @@
 @import "tailwindcss";
 
+/*
+ * 팔레트: 로또 용지. 차가운 회백 종이, 남색 잉크, 용지에 인쇄된 빨강 하나.
+ * 공 색은 동행복권 구간 색(1~10 노랑, 11~20 파랑, 21~30 빨강, 31~40 회색, 41~45 초록)을
+ * 남색 숫자와 대비 4.5:1 이상이 되도록 조정했다.
+ * 모서리: 공은 원, 카드 8px(rounded-lg), 버튼·입력 6px(rounded-md).
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --paper: #f4f6f9;
+  --surface: #fdfdfe;
+  --ink: #1c2541;
+  --muted: #586079;
+  --rule: #d8dce5;
+  --slip: #c42f4f;
+  --slip-soft: #fbe9ed;
+  --on-slip: #fdfdfe;
+  --danger: #b42318;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --ball-yellow: #f5c02d;
+  --ball-blue: #5fb7e5;
+  --ball-red: #f06c6c;
+  --ball-gray: #a3a8b2;
+  --ball-green: #9ccb3b;
+  --ball-ink: #1c2541;
+
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #10151f;
+    --surface: #171e2b;
+    --ink: #e4e8f0;
+    --muted: #98a1b4;
+    --rule: #2a3345;
+    --slip: #f27c93;
+    --slip-soft: #2e1b25;
+    --on-slip: #10151f;
+    --danger: #f97066;
+
+    color-scheme: dark;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-slip: var(--slip);
+  --color-slip-soft: var(--slip-soft);
+  --color-on-slip: var(--on-slip);
+  --color-danger: var(--danger);
+  --color-ball-yellow: var(--ball-yellow);
+  --color-ball-blue: var(--ball-blue);
+  --color-ball-red: var(--ball-red);
+  --color-ball-gray: var(--ball-gray);
+  --color-ball-green: var(--ball-green);
+  --color-ball-ink: var(--ball-ink);
+  --font-sans:
+    var(--font-plex), "Apple SD Gothic Neo", "Malgun Gothic", system-ui,
+    sans-serif;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--paper);
+  color: var(--ink);
+  word-break: keep-all;
+}
+
+:focus-visible {
+  outline: 2px solid var(--slip);
+  outline-offset: 2px;
+}
+
+summary {
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
 }

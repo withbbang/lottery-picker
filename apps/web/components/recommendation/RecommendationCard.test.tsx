@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecommendationCard } from "@/components/recommendation/RecommendationCard";
@@ -98,7 +99,43 @@ describe("RecommendationCard", () => {
     expect(within(lines[3]).getByText("번호 쌍")).toBeInTheDocument();
     expect(screen.getByText("1249회")).toBeInTheDocument();
     expect(screen.getByText("2026-11-06")).toBeInTheDocument();
-    expect(screen.getByText("통계 입력: 1~1248회")).toBeInTheDocument();
+    expect(screen.getByText("분석 범위: 1~1248회")).toBeInTheDocument();
+  });
+
+  it("shows each strategy's description next to its name", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: set })),
+    );
+
+    // when
+    renderCard();
+
+    // then
+    const lines = await screen.findAllByRole("article");
+    expect(
+      within(lines[0]).getByRole("heading", {
+        name: "최근 빈도 최근 50회에 자주 나온 번호 위주",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the evidence until its button is pressed", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: set })),
+    );
+    renderCard();
+    const [first] = await screen.findAllByRole("article");
+    const toggle = within(first).getByRole("button", { name: "근거" });
+    expect(within(first).getByText("중복 제한 완화")).not.toBeVisible();
+
+    // when
+    await userEvent.click(toggle);
+
+    // then
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(first).getByText("중복 제한 완화")).toBeVisible();
   });
 
   it("shows identical evidence lines without a key warning", async () => {
@@ -153,7 +190,7 @@ describe("RecommendationCard", () => {
     renderCard();
 
     // then
-    expect(await screen.findByText("텔레그램 발송 실패")).toBeInTheDocument();
+    expect(await screen.findByText("텔레그램 알림을 보내지 못했습니다. 번호는 여기서 확인하세요.")).toBeInTheDocument();
   });
 
   it("hides the warning unless the telegram send failed", async () => {
@@ -167,7 +204,7 @@ describe("RecommendationCard", () => {
 
     // then
     await screen.findAllByRole("article");
-    expect(screen.queryByText("텔레그램 발송 실패")).not.toBeInTheDocument();
+    expect(screen.queryByText("텔레그램 알림을 보내지 못했습니다. 번호는 여기서 확인하세요.")).not.toBeInTheDocument();
   });
 
   it("shows an empty message on 204", async () => {

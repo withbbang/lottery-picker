@@ -36,7 +36,7 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <label className="flex flex-col gap-2">
-        <span className="font-medium">OTP 코드</span>
+        <span className="text-sm font-medium">인증 코드</span>
         <input
           type="text"
           inputMode="numeric"
@@ -45,18 +45,18 @@ export function LoginForm() {
           onChange={(event) =>
             setCode(event.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))
           }
-          className="rounded-md border border-neutral-400 px-3 py-2 text-lg tracking-widest"
+          className="rounded-md border border-rule bg-surface px-3 py-2.5 text-center text-2xl font-semibold tracking-[0.5em] tabular-nums"
         />
       </label>
       <button
         type="submit"
         disabled={code.length !== CODE_LENGTH || login.isPending}
-        className="rounded-md bg-neutral-900 px-4 py-2 font-medium text-white disabled:opacity-50"
+        className="rounded-md bg-slip px-4 py-2.5 font-semibold text-on-slip hover:bg-slip/90 disabled:opacity-40"
       >
         로그인
       </button>
       {login.isError && (
-        <p role="alert" className="text-red-700">
+        <p role="alert" className="text-sm text-danger">
           {login.error instanceof ApiError
             ? login.error.message
             : FALLBACK_ERROR}

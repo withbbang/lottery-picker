@@ -48,7 +48,7 @@ async function renderForm() {
   return {
     fixed: await screen.findByRole("textbox", { name: "고정 번호" }),
     excluded: screen.getByRole("textbox", { name: "제외 번호" }),
-    save: screen.getByRole("button", { name: "저장" }),
+    save: screen.getByRole("button", { name: "설정 저장" }),
   };
 }
 
@@ -212,7 +212,7 @@ describe("SettingsForm", () => {
 
     // then
     expect(
-      screen.getByText("변경 내용은 다음 추천 생성부터 적용됩니다."),
+      screen.getByText(/바꾼 설정은 다음 추천부터 적용됩니다\./),
     ).toBeInTheDocument();
   });
 });

@@ -7,10 +7,20 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
-import { LottoBall } from "@/components/lotto/LottoBall";
+import { DrawnBalls } from "@/components/lotto/LottoBall";
 import type { PageResponse, RoundSummaryResponse } from "@/types/api/round";
 
 const PAGE_SIZE = 20;
+const PAGE_WINDOW = 5;
+const PAGE_BUTTON =
+  "flex size-9 items-center justify-center rounded-md font-medium hover:bg-surface disabled:opacity-30 disabled:hover:bg-transparent";
+
+/** 현재 페이지가 속한 5개 묶음(1~5, 6~10…)의 0부터 센 페이지 번호. */
+function pageWindow(page: number, totalPages: number) {
+  const start = Math.floor(page / PAGE_WINDOW) * PAGE_WINDOW;
+  const end = Math.min(start + PAGE_WINDOW, totalPages);
+  return Array.from({ length: end - start }, (_, i) => start + i);
+}
 
 export function RoundList() {
   const [page, setPage] = useState(0);
@@ -24,56 +34,97 @@ export function RoundList() {
   });
 
   if (isPending) {
-    return <p>회차 목록을 불러오는 중…</p>;
+    return <p className="text-muted">회차 목록을 불러오는 중…</p>;
   }
   if (isError) {
-    return <p role="alert">회차 목록을 불러오지 못했습니다.</p>;
+    return (
+      <p role="alert" className="text-danger">
+        회차 목록을 불러오지 못했습니다.
+      </p>
+    );
   }
 
   if (data.items.length === 0) {
-    return <p>조회된 회차가 없습니다.</p>;
+    return <p className="text-muted">아직 수집한 회차가 없습니다.</p>;
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <ul className="flex flex-col">
+      <ul className="flex flex-col overflow-hidden rounded-lg border border-rule bg-surface">
         {data.items.map((r) => (
-          <li key={r.round} className="border-t border-current/20">
-            <Link href={`/rounds/${r.round}`} className="flex flex-col gap-2 py-3">
-              <span className="flex justify-between text-sm tabular-nums">
+          <li key={r.round} className="border-t border-rule first:border-t-0">
+            <Link
+              href={`/rounds/${r.round}`}
+              className="flex flex-col gap-2 px-4 py-3 hover:bg-paper"
+            >
+              <span className="flex items-baseline justify-between text-sm tabular-nums">
                 <span className="font-semibold">{r.round}회</span>
-                <span className="opacity-70">{r.drawDate}</span>
+                <span className="text-muted">{r.drawDate}</span>
               </span>
-              <span className="flex flex-wrap items-center gap-1">
-                {r.numbers.map((n) => (
-                  <LottoBall key={n} value={n} />
-                ))}
-                <span aria-hidden="true">+</span>
-                <LottoBall value={r.bonus} />
-              </span>
+              <DrawnBalls numbers={r.numbers} bonus={r.bonus} fill />
             </Link>
           </li>
         ))}
       </ul>
-      <nav className="flex items-center justify-between text-sm tabular-nums">
+      <nav
+        aria-label="페이지"
+        className="flex items-center justify-center gap-0.5 text-sm tabular-nums"
+      >
         <button
           type="button"
-          className="rounded border border-current px-3 py-2 disabled:opacity-40"
+          aria-label="첫 페이지"
+          className={PAGE_BUTTON}
+          disabled={page === 0}
+          onClick={() => setPage(0)}
+        >
+          <span aria-hidden="true">«</span>
+        </button>
+        <button
+          type="button"
+          aria-label="이전 페이지"
+          className={PAGE_BUTTON}
           disabled={page === 0}
           onClick={() => setPage((p) => p - 1)}
         >
-          이전
+          <span aria-hidden="true">‹</span>
         </button>
-        <span>
-          {data.page + 1} / {data.totalPages}
-        </span>
+        {pageWindow(data.page, data.totalPages).map((p) =>
+          p === data.page ? (
+            <span
+              key={p}
+              aria-current="page"
+              className="flex size-9 items-center justify-center rounded-md bg-slip font-semibold text-on-slip"
+            >
+              {p + 1}
+            </span>
+          ) : (
+            <button
+              key={p}
+              type="button"
+              className={`${PAGE_BUTTON} text-muted hover:text-ink`}
+              onClick={() => setPage(p)}
+            >
+              {p + 1}
+            </button>
+          ),
+        )}
         <button
           type="button"
-          className="rounded border border-current px-3 py-2 disabled:opacity-40"
+          aria-label="다음 페이지"
+          className={PAGE_BUTTON}
           disabled={page + 1 >= data.totalPages}
           onClick={() => setPage((p) => p + 1)}
         >
-          다음
+          <span aria-hidden="true">›</span>
+        </button>
+        <button
+          type="button"
+          aria-label="마지막 페이지"
+          className={PAGE_BUTTON}
+          disabled={page + 1 >= data.totalPages}
+          onClick={() => setPage(data.totalPages - 1)}
+        >
+          <span aria-hidden="true">»</span>
         </button>
       </nav>
     </div>
