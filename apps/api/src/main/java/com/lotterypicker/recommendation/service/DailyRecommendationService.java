@@ -2,8 +2,10 @@ package com.lotterypicker.recommendation.service;
 
 import com.lotterypicker.common.BusinessException;
 import com.lotterypicker.common.ErrorCode;
+import com.lotterypicker.common.config.ClockConfig;
 import com.lotterypicker.notification.NotificationKind;
 import com.lotterypicker.notification.service.NotificationService;
+import com.lotterypicker.recommendation.CatchUpPolicy;
 import com.lotterypicker.recommendation.RecommendationSet;
 import com.lotterypicker.recommendation.RoundCalendar;
 import com.lotterypicker.recommendation.StoredLine;
@@ -24,6 +26,7 @@ import com.lotterypicker.round.repository.LottoRoundRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -100,17 +103,40 @@ public class DailyRecommendationService {
 
 	/** 화면용 조회. 대조군은 성적표에만 쓰므로 뺀다. */
 	public Optional<RecommendationSetResponse> find(LocalDate date) {
-		List<DailyRecommendation> lines = repository.findByDateOrderByLineIndexAsc(date).stream()
-			.filter(line -> !line.isControl())
-			.toList();
+		return toResponse(repository.findByDateOrderByLineIndexAsc(date), date);
+	}
+
+	/**
+	 * 화면 기본 조회. 오늘 추천이 없으면(17시 전) 가장 최근 추천을 대신 돌려준다. 기간 제한은 두지 않는다.
+	 */
+	public Optional<RecommendationSetResponse> findLatest(LocalDate today) {
+		List<DailyRecommendation> lines = repository.findByDateOrderByLineIndexAsc(today);
+		if (lines.isEmpty()) {
+			lines = repository.findFirstByDateLessThanEqualOrderByDateDesc(today)
+				.map(latest -> repository.findByDateOrderByLineIndexAsc(latest.getDate()))
+				.orElse(List.of());
+		}
+		return toResponse(lines, today);
+	}
+
+	private Optional<RecommendationSetResponse> toResponse(List<DailyRecommendation> stored, LocalDate today) {
+		List<DailyRecommendation> lines = stored.stream().filter(line -> !line.isControl()).toList();
 		if (lines.isEmpty()) {
 			return Optional.empty();
 		}
 		DailyRecommendation first = lines.get(0);
-		return Optional.of(new RecommendationSetResponse(first.getDate(), first.getRoundNo(),
+		LocalDate date = first.getDate();
+		ZonedDateTime now = ZonedDateTime.now(clock).withZoneSameInstant(ClockConfig.SEOUL);
+		boolean carriedOver = !date.equals(today);
+		// 17시 생성을 놓친 토요일 밤처럼 날짜만으로는 마감을 알 수 없어 판매 마감 시각과 비교한다.
+		boolean roundClosed = !now
+			.isBefore(RoundCalendar.targetSaturday(date).atTime(CatchUpPolicy.SALES_CLOSE).atZone(ClockConfig.SEOUL));
+		boolean todayPending = carriedOver && now.toLocalTime().isBefore(CatchUpPolicy.GENERATION_TIME);
+		return Optional.of(new RecommendationSetResponse(date, first.getRoundNo(),
 				lines.stream().map(RecommendationLineResponse::from).toList(), first.getHistoryFromRound(),
 				first.getHistoryToRound(), RecommendationSetResponse.DISCLAIMER,
-				notifications.statusOf(NotificationKind.DAILY_RECOMMENDATION, date.toString())));
+				notifications.statusOf(NotificationKind.DAILY_RECOMMENDATION, date.toString()), carriedOver,
+				roundClosed, todayPending));
 	}
 
 	/** 알림 재발송용 조회. 대조군은 알림에 보내지 않으므로 뺀다. */

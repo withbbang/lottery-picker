@@ -8,8 +8,8 @@ import java.time.ZonedDateTime;
 /** 17시에 서버가 꺼져 있었을 때 기동 시 그날 추천을 보충할지 판단한다. */
 public final class CatchUpPolicy {
 
-	private static final LocalTime GENERATION_TIME = LocalTime.of(17, 0);
-	private static final LocalTime SALES_CLOSE = LocalTime.of(20, 0);
+	public static final LocalTime GENERATION_TIME = LocalTime.of(17, 0);
+	public static final LocalTime SALES_CLOSE = LocalTime.of(20, 0);
 
 	private CatchUpPolicy() {
 	}

@@ -3,7 +3,10 @@ package com.lotterypicker.recommendation.controller;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -161,7 +165,116 @@ class RecommendationControllerTest {
 		var result = mockMvc.perform(get("/api/v1/recommendations"));
 
 		// then
-		result.andExpect(status().isOk()).andExpect(jsonPath("$.data.date").value("2026-11-06"));
+		result.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.date").value("2026-11-06"))
+			.andExpect(jsonPath("$.data.carriedOver").value(false));
+	}
+
+	/** 오늘 줄은 없고, 가장 최근 추천이 {@code latest}인 상태. */
+	private void givenLatest(LocalDate latest, List<DailyRecommendation> lines) {
+		given(repository.findByDateOrderByLineIndexAsc(TODAY)).willReturn(List.of());
+		given(repository.findFirstByDateLessThanEqualOrderByDateDesc(TODAY))
+			.willReturn(Optional.of(line(latest, StrategyType.RECENT_HOT, 0)));
+		given(repository.findByDateOrderByLineIndexAsc(latest)).willReturn(lines);
+	}
+
+	@Test
+	void 오늘_추천이_없으면_가장_최근_추천이다() throws Exception {
+		// given
+		LocalDate yesterday = LocalDate.of(2026, 11, 5);
+		givenLatest(yesterday, storedSet(yesterday));
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations"));
+
+		// then
+		result.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.date").value("2026-11-05"))
+			.andExpect(jsonPath("$.data.carriedOver").value(true))
+			.andExpect(jsonPath("$.data.roundClosed").value(false))
+			.andExpect(jsonPath("$.data.lines", hasSize(5)));
+	}
+
+	@Test
+	void 오늘_추천이_있으면_오늘_것이다() throws Exception {
+		// given
+		given(repository.findByDateOrderByLineIndexAsc(TODAY)).willReturn(storedSet(TODAY));
+		given(repository.findFirstByDateLessThanEqualOrderByDateDesc(TODAY))
+			.willReturn(Optional.of(line(TODAY, StrategyType.RECENT_HOT, 0)));
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations"));
+
+		// then
+		result.andExpect(jsonPath("$.data.date").value("2026-11-06"))
+			.andExpect(jsonPath("$.data.carriedOver").value(false))
+			.andExpect(jsonPath("$.data.roundClosed").value(false));
+	}
+
+	@Test
+	void 지난_토요일_추천은_마감이다() throws Exception {
+		// given
+		LocalDate lastSaturday = LocalDate.of(2026, 10, 31);
+		givenLatest(lastSaturday, storedSet(lastSaturday));
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations"));
+
+		// then
+		result.andExpect(jsonPath("$.data.roundClosed").value(true))
+			.andExpect(jsonPath("$.data.round").value(1249));
+	}
+
+	@Test
+	void 오래된_추천도_돌려준다() throws Exception {
+		// given
+		LocalDate old = LocalDate.of(2026, 10, 20);
+		givenLatest(old, storedSet(old));
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations"));
+
+		// then
+		result.andExpect(status().isOk()).andExpect(jsonPath("$.data.date").value("2026-10-20"));
+	}
+
+	@Test
+	void 추천이_하나도_없으면_204이다() throws Exception {
+		// given
+		given(repository.findByDateOrderByLineIndexAsc(any())).willReturn(List.of());
+		given(repository.findFirstByDateLessThanEqualOrderByDateDesc(TODAY)).willReturn(Optional.empty());
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations"));
+
+		// then
+		result.andExpect(status().isNoContent()).andExpect(content().string(""));
+	}
+
+	@Test
+	void 가장_최근_날짜에_추천_줄이_없으면_204이다() throws Exception {
+		// given
+		LocalDate yesterday = LocalDate.of(2026, 11, 5);
+		givenLatest(yesterday, List.of(line(yesterday, StrategyType.CONTROL, 0)));
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations"));
+
+		// then
+		result.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void 날짜를_명시하면_그_날짜만_찾는다() throws Exception {
+		// given
+		given(repository.findByDateOrderByLineIndexAsc(TODAY)).willReturn(List.of());
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations").param("date", "2026-11-06"));
+
+		// then
+		result.andExpect(status().isNoContent());
+		then(repository).should(never()).findFirstByDateLessThanEqualOrderByDateDesc(any());
 	}
 
 	@Test

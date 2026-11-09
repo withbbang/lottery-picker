@@ -28,6 +28,12 @@ export const STRATEGY_DESCRIPTIONS: Record<StrategyType, string> = {
   BALANCED: "홀짝·합계가 고른 조합",
 };
 
+/** "2026-11-05" → "11월 5일". 날짜 계산 없이 문자열만 나눈다. */
+function monthDay(date: string) {
+  const [, month, day] = date.split("-");
+  return `${Number(month)}월 ${Number(day)}일`;
+}
+
 /** 로또 용지의 게임 칸 이름. 줄 순서대로 A, B, C… */
 function gameLetter(index: number) {
   return String.fromCharCode(65 + index);
@@ -67,6 +73,22 @@ export function RecommendationCard() {
 
   return (
     <div className="flex flex-col gap-4">
+      {data.carriedOver && (
+        <div className="flex flex-col gap-0.5 rounded-md border border-rule px-3 py-2 text-sm text-muted">
+          <p>
+            {data.todayPending
+              ? "오늘 추천은 오후 5시에 나옵니다."
+              : "오늘 추천을 만들지 못했습니다."}{" "}
+            아래는 {monthDay(data.date)} 추천입니다.
+          </p>
+          {data.roundClosed && (
+            <p>
+              {data.round}회는 추첨이 끝났지만, 번호는 이번 회차에도 살 수
+              있습니다.
+            </p>
+          )}
+        </div>
+      )}
       {data.notificationStatus === "FAILED" && (
         <p className="rounded-md bg-slip-soft px-3 py-2 text-sm font-medium text-slip">
           텔레그램 알림을 보내지 못했습니다. 번호는 여기서 확인하세요.

@@ -33,8 +33,13 @@ class DailyRecommendationRepositoryTest {
 	private EntityManager entityManager;
 
 	private static DailyRecommendation line(StrategyType strategy, int lineIndex, List<String> evidence) {
+		return line(DATE, strategy, lineIndex, evidence);
+	}
+
+	private static DailyRecommendation line(LocalDate date, StrategyType strategy, int lineIndex,
+			List<String> evidence) {
 		return DailyRecommendation.builder()
-			.date(DATE)
+			.date(date)
 			.roundNo(1249)
 			.strategy(strategy)
 			.lineIndex(lineIndex)
@@ -76,6 +81,23 @@ class DailyRecommendationRepositoryTest {
 		assertThat(stored.getHistoryToRound()).isEqualTo(1248);
 		assertThat(stored.isControl()).isFalse();
 		assertThat(stored.hasSettings()).isTrue();
+	}
+
+	@Test
+	void 가장_최근_날짜의_줄_하나를_찾는다() {
+		// given
+		repository.saveAll(List.of(line(LocalDate.of(2026, 11, 4), StrategyType.PAIR, 0, List.of()),
+				line(LocalDate.of(2026, 11, 5), StrategyType.PAIR, 0, List.of()),
+				line(LocalDate.of(2026, 11, 5), StrategyType.BALANCED, 1, List.of()),
+				line(LocalDate.of(2026, 11, 7), StrategyType.PAIR, 0, List.of())));
+		entityManager.flush();
+		entityManager.clear();
+
+		// when
+		var found = repository.findFirstByDateLessThanEqualOrderByDateDesc(DATE);
+
+		// then
+		assertThat(found).hasValueSatisfying(line -> assertThat(line.getDate()).isEqualTo(LocalDate.of(2026, 11, 5)));
 	}
 
 	@Test
@@ -149,7 +171,7 @@ class DailyRecommendationRepositoryTest {
 
 		// then
 		assertThat(names).containsExactlyInAnyOrder("saveAll", "existsByDate", "findByDateOrderByLineIndexAsc",
-				"findByRoundNoOrderByDateAscLineIndexAsc", "findAllById");
+				"findByRoundNoOrderByDateAscLineIndexAsc", "findAllById", "findFirstByDateLessThanEqualOrderByDateDesc");
 	}
 
 }

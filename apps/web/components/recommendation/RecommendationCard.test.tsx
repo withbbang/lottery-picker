@@ -17,6 +17,9 @@ const set: RecommendationSetResponse = {
   historyToRound: 1248,
   disclaimer: DISCLAIMER,
   notificationStatus: "SENT",
+  carriedOver: false,
+  roundClosed: false,
+  todayPending: false,
   lines: [
     {
       strategy: "RECENT_HOT",
@@ -100,6 +103,99 @@ describe("RecommendationCard", () => {
     expect(screen.getByText("1249회")).toBeInTheDocument();
     expect(screen.getByText("2026-11-06")).toBeInTheDocument();
     expect(screen.getByText("분석 범위: 1~1248회")).toBeInTheDocument();
+  });
+
+  it("explains that today's set comes at 5 pm when showing an earlier set", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            ...set,
+            date: "2026-11-05",
+            carriedOver: true,
+            todayPending: true,
+          },
+        }),
+      ),
+    );
+
+    // when
+    renderCard();
+
+    // then
+    expect(
+      await screen.findByText(
+        "오늘 추천은 오후 5시에 나옵니다. 아래는 11월 5일 추천입니다.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("article")).toHaveLength(5);
+  });
+
+  it("notes the numbers can still be bought when the round is closed", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            ...set,
+            date: "2026-10-31",
+            carriedOver: true,
+            roundClosed: true,
+            todayPending: true,
+          },
+        }),
+      ),
+    );
+
+    // when
+    renderCard();
+
+    // then
+    expect(
+      await screen.findByText(
+        "1249회는 추첨이 끝났지만, 번호는 이번 회차에도 살 수 있습니다.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says today's set could not be made when 5 pm has passed", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { ...set, date: "2026-11-05", carriedOver: true },
+        }),
+      ),
+    );
+
+    // when
+    renderCard();
+
+    // then
+    expect(
+      await screen.findByText(
+        "오늘 추천을 만들지 못했습니다. 아래는 11월 5일 추천입니다.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/오후 5시에 나옵니다/)).toBeNull();
+  });
+
+  it("shows no carry-over notice for today's set", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: set })),
+    );
+
+    // when
+    renderCard();
+
+    // then
+    await screen.findAllByRole("article");
+    expect(screen.queryByText(/오후 5시에 나옵니다/)).toBeNull();
   });
 
   it("shows each strategy's description next to its name", async () => {

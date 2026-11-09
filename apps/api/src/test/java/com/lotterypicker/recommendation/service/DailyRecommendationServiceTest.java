@@ -18,6 +18,7 @@ import com.lotterypicker.notification.NotificationStatus;
 import com.lotterypicker.notification.service.NotificationService;
 import com.lotterypicker.recommendation.RecommendationSet;
 import com.lotterypicker.recommendation.StoredLine;
+import com.lotterypicker.recommendation.dto.RecommendationSetResponse;
 import com.lotterypicker.recommendation.engine.DrawHistory;
 import com.lotterypicker.recommendation.engine.HistoricalDraw;
 import com.lotterypicker.recommendation.engine.RecommendationConstraint;
@@ -390,6 +391,75 @@ class DailyRecommendationServiceTest {
 
 		// then
 		assertThat(stored).isEqualTo(created);
+	}
+
+	@Test
+	void 같은_주_토요일까지는_마감이_아니다() {
+		// given: 금요일 추천만 있고 토요일 추천은 아직 없다
+		service.generateIfAbsent(DATE);
+		LocalDate saturday = DATE.plusDays(1);
+		when(repository.findFirstByDateLessThanEqualOrderByDateDesc(saturday))
+			.thenReturn(Optional.of(db.get(0)));
+
+		// when
+		RecommendationSetResponse found = service.findLatest(saturday).orElseThrow();
+
+		// then
+		assertThat(found.date()).isEqualTo(DATE);
+		assertThat(found.carriedOver()).isTrue();
+		assertThat(found.roundClosed()).isFalse();
+	}
+
+	@Test
+	void 토요일_판매_마감_뒤에는_금요일_추천도_마감이다() {
+		// given: 토요일 17시 생성을 놓쳐 21시에도 금요일 추천이 가장 최근이다
+		service.generateIfAbsent(DATE);
+		LocalDate saturday = DATE.plusDays(1);
+		when(repository.findFirstByDateLessThanEqualOrderByDateDesc(saturday))
+			.thenReturn(Optional.of(db.get(0)));
+		DailyRecommendationService at21 = serviceAt(
+				Clock.fixed(Instant.parse("2026-11-07T12:00:00Z"), SEOUL));
+
+		// when
+		RecommendationSetResponse found = at21.findLatest(saturday).orElseThrow();
+
+		// then
+		assertThat(found.roundClosed()).isTrue();
+		assertThat(found.todayPending()).isFalse();
+	}
+
+	@Test
+	void 오후_5시_전_이월이면_오늘_추천을_기다리는_중이다() {
+		// given
+		service.generateIfAbsent(DATE);
+		LocalDate saturday = DATE.plusDays(1);
+		when(repository.findFirstByDateLessThanEqualOrderByDateDesc(saturday))
+			.thenReturn(Optional.of(db.get(0)));
+		DailyRecommendationService at9 = serviceAt(Clock.fixed(Instant.parse("2026-11-07T00:00:00Z"), SEOUL));
+
+		// when
+		RecommendationSetResponse found = at9.findLatest(saturday).orElseThrow();
+
+		// then
+		assertThat(found.todayPending()).isTrue();
+		assertThat(found.roundClosed()).isFalse();
+	}
+
+	@Test
+	void 오후_5시가_지나도_오늘_추천이_없으면_기다리는_중이_아니다() {
+		// given: 평일 17시 생성이 실패했다
+		service.generateIfAbsent(DATE);
+		LocalDate monday = LocalDate.of(2026, 11, 9);
+		when(repository.findFirstByDateLessThanEqualOrderByDateDesc(monday))
+			.thenReturn(Optional.of(db.get(0)));
+		DailyRecommendationService at18 = serviceAt(Clock.fixed(Instant.parse("2026-11-09T09:00:00Z"), SEOUL));
+
+		// when
+		RecommendationSetResponse found = at18.findLatest(monday).orElseThrow();
+
+		// then
+		assertThat(found.carriedOver()).isTrue();
+		assertThat(found.todayPending()).isFalse();
 	}
 
 	@Test
