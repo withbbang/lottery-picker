@@ -17,6 +17,7 @@ export default function Home() {
       <nav className="flex gap-4 text-sm underline">
         <Link href="/rounds">역대 당첨번호</Link>
         <Link href="/settings">번호 설정</Link>
+        <Link href="/performance">성적표</Link>
       </nav>
     </main>
   );

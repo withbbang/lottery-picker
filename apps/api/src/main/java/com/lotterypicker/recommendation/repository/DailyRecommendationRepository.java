@@ -14,6 +14,9 @@ public interface DailyRecommendationRepository extends Repository<DailyRecommend
 
 	List<DailyRecommendation> findByDateOrderByLineIndexAsc(LocalDate date);
 
+	/** 성적표 집계에서 채점된 줄의 추천을 한 번에 가져온다. */
+	List<DailyRecommendation> findAllById(Iterable<Long> ids);
+
 	/** 추천과 대조군을 모두 돌려준다. 대조군 제외는 쓰는 쪽에서 한다. */
 	List<DailyRecommendation> findByRoundNoOrderByDateAscLineIndexAsc(int roundNo);
 

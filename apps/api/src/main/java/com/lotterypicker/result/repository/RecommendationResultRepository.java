@@ -12,6 +12,9 @@ public interface RecommendationResultRepository extends Repository<Recommendatio
 
 	List<RecommendationResult> findByRoundNo(int roundNo);
 
+	/** 성적표 집계용. 채점된 줄 전체. */
+	List<RecommendationResult> findAll();
+
 	/** 당첨번호는 저장됐는데 채점하지 않은 추천 줄이 있는 회차. 아직 추첨 전인 회차는 빠진다. */
 	@Query("""
 			select distinct d.roundNo from DailyRecommendation d
