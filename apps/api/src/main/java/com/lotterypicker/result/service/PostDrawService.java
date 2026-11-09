@@ -5,6 +5,7 @@ import com.lotterypicker.lotto.LottoNumbers;
 import com.lotterypicker.lotto.PrizeRank;
 import com.lotterypicker.notification.MessageFormatter;
 import com.lotterypicker.notification.NotificationKind;
+import com.lotterypicker.notification.NotificationStatus;
 import com.lotterypicker.notification.service.NotificationService;
 import com.lotterypicker.recommendation.entity.DailyRecommendation;
 import com.lotterypicker.recommendation.repository.DailyRecommendationRepository;
@@ -57,7 +58,28 @@ public class PostDrawService {
 			log.warn("{}회 당첨번호가 없어 채점하지 않습니다.", round);
 			return;
 		}
-		LottoRound drawn = stored.get();
+		process(stored.get());
+	}
+
+	/**
+	 * 종료 알림을 아직 보내지 못한 최근 회차를 다시 처리한다. 발송 실패(FAILED)나 채점 후 알림 전에 멈춘 경우를 잡는다.
+	 * 7일 안의 회차는 최신 회차와 직전 회차뿐이므로 두 회차만 본다. 이미 보낸 회차는 건드리지 않는다.
+	 */
+	public void resendUnsent() {
+		rounds.findTopByOrderByRoundNoDesc().ifPresent(latest -> {
+			List<Integer> candidates = List.of(latest.getRoundNo() - 1, latest.getRoundNo());
+			for (int round : candidates) {
+				if (notifications.statusOf(NotificationKind.DRAW_FINISHED, String.valueOf(round))
+						== NotificationStatus.SENT) {
+					continue;
+				}
+				rounds.findById(round).ifPresent(this::process);
+			}
+		});
+	}
+
+	private void process(LottoRound drawn) {
+		int round = drawn.getRoundNo();
 		List<DailyRecommendation> lines = recommendations.findByRoundNoOrderByDateAscLineIndexAsc(round);
 		List<RecommendationResult> scored = score(drawn, lines);
 

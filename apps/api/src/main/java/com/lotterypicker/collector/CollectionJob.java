@@ -40,22 +40,36 @@ public class CollectionJob {
 	private final CollectionLock lock;
 	private final Clock clock;
 
+	/**
+	 * 확인 시각이면 수집하고, 매번 보내지 못한 최근 종료 알림을 다시 보낸다. 재발송은 수집이 실패해도 한다.
+	 * 재발송은 최근 두 회차만 보고 이미 보낸 회차는 건너뛰므로 5분마다 돌아도 가볍다.
+	 */
 	@Scheduled(cron = "0 */5 * * * *", zone = "Asia/Seoul")
 	public void poll() {
 		// 초기 적재 전에는 기동 수집이 맡는다.
 		Optional<LocalDate> latest = rounds.findTopByOrderByRoundNoDesc().map(LottoRound::getDrawDate);
-		ZonedDateTime now = ZonedDateTime.now(clock);
-		if (latest.isEmpty() || !PollPolicy.isDue(now, latest.get())) {
+		if (latest.isEmpty()) {
 			return;
 		}
+		ZonedDateTime now = ZonedDateTime.now(clock);
 		lock.tryRun("5분 확인", () -> {
-			if (PollPolicy.isOverdue(now, latest.get())) {
-				LocalDate expected = latest.get().plusDays(DAYS_PER_ROUND);
-				notifications.sendOnce(NotificationKind.COLLECTION_FAILED, expected.toString(),
-						MessageFormatter.collectionFailed(expected));
+			try {
+				if (PollPolicy.isDue(now, latest.get())) {
+					collectDue(now, latest.get());
+				}
+			} finally {
+				postDraw.resendUnsent();
 			}
-			collectRounds();
 		});
+	}
+
+	private void collectDue(ZonedDateTime now, LocalDate latest) {
+		if (PollPolicy.isOverdue(now, latest)) {
+			LocalDate expected = latest.plusDays(DAYS_PER_ROUND);
+			notifications.sendOnce(NotificationKind.COLLECTION_FAILED, expected.toString(),
+					MessageFormatter.collectionFailed(expected));
+		}
+		collectRounds();
 	}
 
 	@Scheduled(cron = "0 0 6 * * *", zone = "Asia/Seoul")

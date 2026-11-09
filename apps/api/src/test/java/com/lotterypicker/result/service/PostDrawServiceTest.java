@@ -2,6 +2,7 @@ package com.lotterypicker.result.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.lotterypicker.lotto.LottoNumbers;
 import com.lotterypicker.lotto.PrizeRank;
 import com.lotterypicker.notification.TelegramClient;
+import com.lotterypicker.notification.TelegramException;
 import com.lotterypicker.notification.repository.NotificationLogRepository;
 import com.lotterypicker.notification.service.NotificationService;
 import com.lotterypicker.recommendation.engine.Relaxation;
@@ -256,6 +258,56 @@ class PostDrawServiceTest {
 		// then
 		assertThat(results.findByRoundNo(1249)).isEmpty();
 		assertThat(results.findByRoundNo(1250)).isEmpty();
+	}
+
+	@Test
+	void 종료_알림_발송이_실패하면_재발송에서_한번_보낸다() {
+		// given: 첫 처리에서 3회 시도가 모두 실패한다
+		rounds.save(round(1249, DRAW_DATE, LocalDateTime.of(2026, 11, 7, 20, 45)));
+		saveWeek(1249, DRAW_DATE);
+		PostDrawService service = serviceOn("2026-11-07T20:45");
+		doThrow(new TelegramException("down"), new TelegramException("down"), new TelegramException("down"))
+			.doNothing()
+			.when(telegram).send(anyString());
+		service.process(1249);
+
+		// when: 다음 확인 두 번
+		service.resendUnsent();
+		service.resendUnsent();
+
+		// then: 실패 3회 + 성공 1회. 보낸 뒤에는 다시 보내지 않는다
+		verify(telegram, times(4)).send(anyString());
+		assertThat(results.findByRoundNo(1249)).hasSize(70);
+	}
+
+	@Test
+	void 채점_후_알림_전에_멈췄으면_재발송에서_채점하고_알린다() {
+		// given: 당첨번호와 추천은 있지만 처리하지 못했다
+		rounds.save(round(1249, DRAW_DATE, LocalDateTime.of(2026, 11, 7, 20, 45)));
+		saveWeek(1249, DRAW_DATE);
+
+		// when
+		serviceOn("2026-11-07T21:00").resendUnsent();
+
+		// then
+		assertThat(results.findByRoundNo(1249)).hasSize(70);
+		assertThat(sentText()).contains("1249회 추첨 결과");
+	}
+
+	@Test
+	void 재발송은_최신_회차와_직전_회차만_본다() {
+		// given: 추천이 있는 오래된 회차는 대상이 아니다
+		rounds.save(round(1247, LocalDate.of(2026, 10, 24), LocalDateTime.of(2026, 10, 24, 20, 45)));
+		saveWeek(1247, LocalDate.of(2026, 10, 24));
+		rounds.save(round(1248, LocalDate.of(2026, 10, 31), LocalDateTime.of(2026, 10, 31, 20, 45)));
+		rounds.save(round(1249, DRAW_DATE, LocalDateTime.of(2026, 11, 7, 20, 45)));
+
+		// when
+		serviceOn("2026-11-07T21:00").resendUnsent();
+
+		// then: 1249(7일 내)과 1248(경계 7일)만 알리고 1247은 건드리지 않는다
+		verify(telegram, times(2)).send(anyString());
+		assertThat(results.findByRoundNo(1247)).isEmpty();
 	}
 
 	@Test

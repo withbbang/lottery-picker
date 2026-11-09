@@ -161,6 +161,31 @@ class CollectionJobTest {
 	}
 
 	@Test
+	void 확인_시각이_아니어도_매번_보내지_못한_종료_알림을_다시_보낸다() {
+		// when
+		jobAt("2026-11-06T12:00").poll();
+
+		// then
+		verify(postDraw).resendUnsent();
+		verify(collector, never()).syncMissingRounds();
+	}
+
+	@Test
+	void 수집과_처리를_마친_뒤_재발송한다() {
+		// given
+		when(collector.syncMissingRounds()).thenReturn(List.of(1249));
+
+		// when
+		jobAt("2026-11-07T20:40").poll();
+
+		// then
+		InOrder order = inOrder(collector, postDraw);
+		order.verify(collector).syncMissingRounds();
+		order.verify(postDraw).process(1249);
+		order.verify(postDraw).resendUnsent();
+	}
+
+	@Test
 	void 다른_수집이_실행_중이면_이번_실행은_건너뛴다() {
 		// given
 		CollectionJob job = jobAt("2026-11-07T20:40");
@@ -175,6 +200,7 @@ class CollectionJobTest {
 		assertThat(ran).isTrue();
 		verify(collector, never()).syncMissingRounds();
 		verify(collector, never()).syncStores();
+		verify(postDraw, never()).resendUnsent();
 	}
 
 	@Test
