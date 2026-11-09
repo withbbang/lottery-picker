@@ -23,6 +23,8 @@ on:
       - "apps/**"
       - "deploy/**"
       - ".github/workflows/deploy.yml"
+      - "!deploy/**/*.md"
+      - "!apps/**/*.md"
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +33,8 @@ concurrency:
 
 jobs:
   build:
+    # 수동 실행에서 다른 브랜치를 고르면 리뷰 안 된 코드가 운영에 나간다. master 만 배포한다.
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -124,15 +128,17 @@ jobs:
           script: |
             set -e
             export PATH=/usr/local/bin:$PATH        # Synology 비대화형 SSH 는 /usr/local/bin(docker) 이 PATH 에 없다
-            cd ${{ env.DEPLOY_DIR }}
+            cd "${{ env.DEPLOY_DIR }}"
             # .env 가 없으면 아래 echo >> 가 IMAGE_TAG 한 줄짜리 .env 를 만들어 버린다. 먼저 막는다.
             if [ ! -f deploy/.env ]; then echo "::error::deploy/.env 가 없습니다 — deploy/README.md 1장"; exit 1; fi
             # TOTP_SECRET 이 비어 있으면 api 가 기동하지 않는다 (README 1-4)
-            if ! grep -q '^TOTP_SECRET=..*' deploy/.env; then echo "::error::deploy/.env 의 TOTP_SECRET 이 비어 있습니다 — deploy/README.md 1-4"; exit 1; fi
+            # 따옴표·공백만 있는 값("" '' 공백)도 비어 있는 것으로 본다
+            TOTP_VAL=$(grep '^TOTP_SECRET=' deploy/.env | tail -n 1 | cut -d= -f2- | tr -d "\"' \t\r")
+            if [ -z "$TOTP_VAL" ]; then echo "::error::deploy/.env 의 TOTP_SECRET 이 비어 있습니다 — deploy/README.md 1-4"; exit 1; fi
             # IMAGE_TAG 는 .env 에 써 넣는다 — sudo 가 환경변수를 초기화해도 compose 가 읽는다
             if grep -q '^IMAGE_TAG=' deploy/.env; then sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${{ github.sha }}/" deploy/.env; else echo "IMAGE_TAG=${{ github.sha }}" >> deploy/.env; fi
             # docker.sock 이 root:root 660 이면 sudoers NOPASSWD(상단 주석 5번) 경유. 비밀번호를 요구하면 즉시 실패(-n)
-            if docker ps >/dev/null 2>&1; then DOCKER=docker; else DOCKER="sudo -n docker"; fi
+            if docker ps >/dev/null 2>&1; then DOCKER=docker; else DOCKER="sudo -n /usr/local/bin/docker"; fi
             DC="$DOCKER compose -f deploy/compose.yml --env-file deploy/.env"
             $DC pull api web
             $DC up -d --remove-orphans

@@ -285,7 +285,7 @@ DSM 제어판 → 로그인 포털 → 고급 → 역방향 프록시 → 생성
 
 ## 3. 다시 배포 (업데이트)
 
-평소 흐름(피처 → `dev` → `master` 병합, `git push origin dev master`)대로 `master`에 푸시하면 끝이다. `apps/**`, `deploy/**`, 워크플로 파일이 바뀐 푸시만 배포한다 (문서만 바뀌면 배포하지 않는다).
+평소 흐름(피처 → `dev` → `master` 병합, `git push origin dev master`)대로 `master`에 푸시하면 끝이다. `apps/**`, `deploy/**`, 워크플로 파일이 바뀐 푸시만 배포한다. 그 안의 `.md`만 바뀐 푸시는 배포하지 않는다. 수동 실행(Run workflow)은 `master`에서만 돈다.
 
 - 진행은 GitHub → Actions → deploy에서 본다. 끝나면 NAS에서 `dc ps`로 확인.
 - 다시 돌리고 싶을 때(실패 후 NAS 쪽을 고쳤을 때 등): Actions → deploy → **Run workflow** (`master`).
