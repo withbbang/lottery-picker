@@ -30,3 +30,6 @@ Thumbs.db
 
 # deploy/backup.sh 기본 덤프 위치
 /backups/
+
+# Playwright MCP 실행 로그·스냅샷
+/.playwright-mcp/
