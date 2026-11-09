@@ -37,7 +37,7 @@ public class TelegramClient {
 			restClient.post()
 				.uri(sendMessageUri())
 				.contentType(MediaType.APPLICATION_JSON)
-				.body(Map.of("chat_id", chatId, "text", text))
+				.body(Map.of("chat_id", chatId, "text", text, "parse_mode", "HTML"))
 				.retrieve()
 				.toBodilessEntity();
 		} catch (RestClientResponseException e) {

@@ -48,6 +48,20 @@ class TelegramClientTest {
 	}
 
 	@Test
+	void 본문을_HTML로_해석하도록_보낸다() {
+		// given
+		server.expect(requestTo(URL))
+			.andExpect(jsonPath("$.parse_mode").value("HTML"))
+			.andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
+
+		// when
+		client.send("<pre>1</pre>");
+
+		// then
+		server.verify();
+	}
+
+	@Test
 	void 실패_예외에_토큰이_포함되지_않는다() {
 		// given
 		server.expect(requestTo(URL)).andRespond(withServerError());

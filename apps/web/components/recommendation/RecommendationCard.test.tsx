@@ -7,7 +7,7 @@ import type { RecommendationSetResponse } from "@/types/api/recommendation";
 
 const fetchMock = vi.fn();
 
-const DISCLAIMER = "번호 선택 방식 설명이며 당첨 확률과 무관합니다.";
+const DISCLAIMER = "실제 당첨 확률과 무관합니다.";
 
 const set: RecommendationSetResponse = {
   date: "2026-11-06",

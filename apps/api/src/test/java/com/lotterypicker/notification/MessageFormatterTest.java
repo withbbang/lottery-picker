@@ -27,18 +27,34 @@ class MessageFormatterTest {
 	}
 
 	@Test
-	void 날짜와_회차_5줄_전략과_고지문을_포함한다() {
+	void 날짜_요일_회차_고정폭_5줄과_고지문을_보낸다() {
 		// when
 		String text = MessageFormatter.recommendation(new RecommendationSet(DATE, 1249, fiveLines()));
 
 		// then
-		assertThat(text).contains("2026-11-06", "1249회")
-			.contains("최근 빈도: 1, 11, 19, 27, 38, 44")
-			.contains("장기 미출현: 2, 11, 19, 27, 38, 44")
-			.contains("전체 빈도: 3, 11, 19, 27, 38, 44")
-			.contains("번호 쌍: 4, 11, 19, 27, 38, 44")
-			.contains("균형: 5, 11, 19, 27, 38, 44")
-			.contains("번호 선택 방식 설명이며 당첨 확률과 무관합니다.");
+		assertThat(text).isEqualTo("""
+				2026-11-06(금) · 1249회 추천
+
+				<pre> 1 · 11 · 19 · 27 · 38 · 44  최근 빈도
+				 2 · 11 · 19 · 27 · 38 · 44  장기 미출현
+				 3 · 11 · 19 · 27 · 38 · 44  전체 빈도
+				 4 · 11 · 19 · 27 · 38 · 44  번호 쌍
+				 5 · 11 · 19 · 27 · 38 · 44  균형</pre>
+
+				실제 당첨 확률과 무관합니다.""");
+	}
+
+	@Test
+	void 한자리_번호는_공백으로_채워_열을_맞춘다() {
+		// given
+		StoredLine line = new StoredLine(StrategyType.LONG_COLD, new LottoNumbers(List.of(2, 9, 15, 23, 31, 40)),
+				List.of("근거"), Relaxation.NONE);
+
+		// when
+		String text = MessageFormatter.recommendation(new RecommendationSet(DATE, 1249, List.of(line)));
+
+		// then
+		assertThat(text).contains(" 2 ·  9 · 15 · 23 · 31 · 40  장기 미출현");
 	}
 
 	@Test
@@ -51,7 +67,7 @@ class MessageFormatterTest {
 		String text = MessageFormatter.recommendation(new RecommendationSet(DATE, 1249, lines));
 
 		// then
-		assertThat(text).doesNotContain("6, 11, 19, 27, 38, 44");
+		assertThat(text).doesNotContain(" 6 · 11 · 19 · 27 · 38 · 44", "대조군");
 	}
 
 	@Test

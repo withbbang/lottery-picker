@@ -185,7 +185,7 @@ class RecommendationControllerTest {
 		var result = mockMvc.perform(get("/api/v1/recommendations"));
 
 		// then
-		result.andExpect(jsonPath("$.data.disclaimer").value("번호 선택 방식 설명이며 당첨 확률과 무관합니다."));
+		result.andExpect(jsonPath("$.data.disclaimer").value("실제 당첨 확률과 무관합니다."));
 	}
 
 	@Test
