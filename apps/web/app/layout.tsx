@@ -13,6 +13,9 @@ const plex = IBM_Plex_Sans_KR({
   subsets: ["latin"],
   variable: "--font-plex",
   display: "swap",
+  // 한글 글꼴은 파일이 수십 개로 쪼개져, 미리 불러오기를 켜면 응답의 Link 헤더가 6KB 가까이 된다.
+  // DSM 역방향 프록시(nginx)의 기본 헤더 버퍼(4KB)를 넘으면 모든 페이지가 502가 된다.
+  preload: false,
 });
 
 export const metadata: Metadata = {
