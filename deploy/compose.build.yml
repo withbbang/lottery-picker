@@ -1,0 +1,13 @@
+# 로컬(Mac) 확인용: GHCR 이미지 대신 소스에서 빌드한다. NAS 에서는 쓰지 않는다.
+#   docker compose -f deploy/compose.yml -f deploy/compose.build.yml --env-file <임시 env> up -d --build
+# 빌드 결과는 compose.yml 의 image 이름(ghcr.io/withbbang/...)으로 태그된다. 푸시하지 않는다.
+
+services:
+  api:
+    build: ../apps/api
+
+  web:
+    build:
+      context: ../apps/web
+      args:
+        API_INTERNAL_URL: http://api:8080

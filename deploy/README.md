@@ -1,6 +1,6 @@
 # 집 서버 배포 (Synology NAS)
 
-웹·API·MySQL을 NAS의 Docker Compose로 실행하고, HTTPS는 DSM 역방향 프록시가 받는다.
+웹·API·MySQL을 NAS의 Docker Compose로 실행하고, HTTPS는 DSM 역방향 프록시가 받는다. 이미지는 GitHub Actions가 빌드해 GHCR에 올리고, NAS는 받아서 실행만 한다 (`chat-app`과 같은 방식).
 
 ```
 휴대폰 ──HTTPS 443──▶ 공유기 ──▶ DSM 역방향 프록시(Let's Encrypt)
@@ -8,20 +8,38 @@
                                       ▼
                          web (127.0.0.1:13000 → 3000) ──/api/*──▶ api:8080 ──▶ mysql:3306
                                                        (Compose 내부 네트워크, 호스트 포트 없음)
+
+master push ──▶ GitHub Actions ──build/push──▶ ghcr.io/withbbang/lottery-picker-{api,web}:<SHA>
+                      │ SSH (NAS_SSH_PORT)
+                      ▼
+                NAS: deploy/ 복사 → deploy/.env 에 IMAGE_TAG=<SHA> → compose pull · up -d
 ```
 
-- 공유기에서 NAS로 넘기는 포트는 **80, 443 두 개뿐**이다. 13000, 3306, 8080, DSM 관리 포트(5000/5001), SSH(22)는 인터넷에 열지 않는다.
+- 공유기에서 NAS로 넘기는 포트는 **80, 443, 배포용 SSH 포트(`NAS_SSH_PORT`)** 세 개다. SSH 포트는 `chat-app` 배포 때문에 이미 열려 있는 것을 같이 쓴다. 13000, 3306, 8080, DSM 관리 포트(5000/5001)는 인터넷에 열지 않는다.
 - web은 NAS의 루프백(`127.0.0.1:13000`)에만 묶여 네트워크 쪽으로는 공개되지 않는다. api, mysql은 호스트 포트가 아예 없다.
-- 모든 컨테이너는 `restart: unless-stopped`, `TZ=Asia/Seoul`.
+- 모든 컨테이너는 `restart: unless-stopped`, `TZ=Asia/Seoul`. web은 api가 healthy가 된 뒤에 뜬다.
+- NAS에는 소스 코드가 가지 않는다. `deploy/` 폴더만 복사된다.
 
 | 파일 | 역할 |
 |---|---|
-| `compose.yml` | mysql:8.4, api, web 구성 (프로젝트 이름 `lottery-picker`) |
+| `compose.yml` | mysql:8.4, api, web 구성 (프로젝트 이름 `lottery-picker`). api·web은 GHCR 이미지 `:${IMAGE_TAG:-latest}` |
+| `compose.build.yml` | 로컬 확인용으로 소스에서 빌드할 때만 겹치는 파일 (8장). NAS에서는 쓰지 않는다 |
 | `.env.example` | 키 목록. 실제 값은 서버의 `deploy/.env`(Git 제외) |
 | `backup.sh` | 일 1회 `mysqldump` → `backups/lottery-*.sql.gz`, 최근 14개 보관 |
 | `restore-check.sh` | 덤프를 임시 MySQL에 복구해 운영 DB와 테이블별 행 수 비교 |
+| `../.github/workflows/deploy.yml` | 빌드·푸시·NAS 배포 워크플로 |
 
-아래 명령은 NAS에서 `/volume1/docker/lottery-picker`에 있다고 가정한다. DSM에서는 docker 명령에 `sudo`가 필요하다. 반복해서 쓰니 별칭을 둔다.
+NAS의 배치 (`/volume1/docker/lottery-picker`, 워크플로 변수 `NAS_DEPLOY_DIR`로 바꿀 수 있다):
+
+```
+/volume1/docker/lottery-picker/
+├── deploy/          ← 워크플로가 매번 덮어쓴다 (Git에 있는 파일만)
+│   ├── compose.yml, backup.sh, ...
+│   └── .env         ← 직접 만든다. 워크플로는 IMAGE_TAG 줄만 고친다
+└── backups/         ← backup.sh가 만든다. 워크플로는 건드리지 않는다
+```
+
+아래 명령은 NAS에서 이 폴더에 있다고 가정한다. DSM에서는 docker 명령에 `sudo`가 필요하다. 반복해서 쓰니 별칭을 둔다.
 
 ```bash
 cd /volume1/docker/lottery-picker
@@ -32,34 +50,52 @@ alias dc='sudo docker compose -f deploy/compose.yml --env-file deploy/.env'
 
 ## 1. 처음 배포
 
-### 1-1. 코드 보내기 (Mac에서)
+### 1-1. NAS 준비 확인 (chat-app과 같은 배포 계정이면 이미 되어 있다)
 
-NAS에는 git이 없다. 배포는 항상 `master`를 묶어서 보낸다. 피처 → `dev` → `master` 병합이 끝난 뒤에 한다.
+`<배포계정>`은 chat-app의 `NAS_SSH_USER`와 같은 계정이다. 아래 세 가지를 확인만 하고, 안 되어 있는 것만 한다.
+
+1. **SSH 키 로그인**: Mac에서 `ssh -p <NAS_SSH_PORT> <배포계정>@<NAS_HOST>`가 비밀번호 없이 들어가지는지. 안 되면 DSM 제어판 → 터미널 및 SNMP에서 SSH를 켜고, 배포용 공개키를 `~/.ssh/authorized_keys`에 넣는다.
+2. **docker를 비밀번호 없이 sudo로**: Synology는 `docker.sock`이 `root:root 660`이라 sudo가 필요하다. 확인:
+   ```bash
+   sudo -n /usr/local/bin/docker ps      # 목록이 나오면 이미 되어 있다
+   ```
+   `a password is required`가 나오면 (visudo 없음):
+   ```bash
+   sudo sh -c 'echo "<배포계정> ALL=(root) NOPASSWD: /usr/local/bin/docker" > /etc/sudoers.d/<배포계정> && chmod 440 /etc/sudoers.d/<배포계정>'
+   ```
+3. **GHCR 로그인**: 워크플로가 처음 만든 패키지는 비공개로 시작한다. chat-app이 같은 소유자(`withbbang`)의 이미지를 받고 있으면 로그인이 이미 되어 있다. 확인:
+   ```bash
+   sudo cat /root/.docker/config.json | grep ghcr    # "ghcr.io" 항목이 있으면 된다
+   ```
+   없으면 GitHub → Settings → Developer settings → Personal access tokens (classic)에서 `read:packages`만 준 토큰을 만들어:
+   ```bash
+   sudo docker login ghcr.io -u withbbang     # 비밀번호 자리에 토큰
+   ```
+   확실한 확인은 1-4의 `dc pull api`가 성공하는지다 (`denied`/`unauthorized`면 로그인 문제).
+
+### 1-2. 배포 폴더와 `deploy/.env`
+
+폴더는 배포 계정이 쓸 수 있어야 한다 (워크플로가 `deploy/`를 풀고 `.env`의 `IMAGE_TAG`를 고친다).
+
+```bash
+# NAS
+sudo mkdir -p /volume1/docker/lottery-picker/deploy
+sudo chown <배포계정> /volume1/docker/lottery-picker
+sudo chown -R <배포계정> /volume1/docker/lottery-picker/deploy
+```
+
+`.env`의 틀은 Mac에서 예시 파일을 그대로 보낸다.
 
 ```bash
 # Mac, 저장소 루트
-git archive --format=tar.gz -o lottery-picker.tar.gz master
-scp -O lottery-picker.tar.gz <NAS계정>@<NAS 내부 IP>:~/
+scp -O -P <NAS_SSH_PORT> deploy/.env.example <배포계정>@<NAS_HOST>:/volume1/docker/lottery-picker/deploy/.env
 ```
 
-- DSM 제어판 → 터미널 및 SNMP에서 SSH를 켜야 한다. `-O`는 DSM에서 SFTP가 꺼져 있어도 되는 예전 scp 방식이다.
-
-### 1-2. 풀기 (NAS에서)
-
 ```bash
-ssh <NAS계정>@<NAS 내부 IP>
-sudo mkdir -p /volume1/docker/lottery-picker
-sudo tar -xzf ~/lottery-picker.tar.gz -C /volume1/docker/lottery-picker
-rm ~/lottery-picker.tar.gz
+# NAS
 cd /volume1/docker/lottery-picker
-```
-
-### 1-3. `deploy/.env` 만들기
-
-```bash
-sudo cp deploy/.env.example deploy/.env
-sudo chmod 600 deploy/.env
-sudo vi deploy/.env
+chmod 600 deploy/.env
+vi deploy/.env
 ```
 
 | 키 | 값 |
@@ -71,40 +107,68 @@ sudo vi deploy/.env
 | `TOTP_SECRET` | 1-4에서 채운다. 지금은 비워 둔다 |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | 텔레그램 봇 값 |
 | `SCHEDULING_ENABLED` | 비워 둔다 (운영은 기본 `true`) |
+| `IMAGE_TAG` | 비워 둔다. 워크플로가 배포할 때마다 커밋 SHA를 써 넣는다 |
 
 - 비밀번호는 영문·숫자로만 만든다 (따옴표, `$`, 공백은 Compose 치환과 충돌한다). 예: `openssl rand -hex 24`.
 - `MYSQL_*`, `DB_PASSWORD`는 **mysql 볼륨을 처음 만들 때만** 적용된다. 나중에 `.env`만 바꾸면 DB 비밀번호는 그대로라 api가 접속에 실패한다 (9장 참고).
 - `SPRING_PROFILES_ACTIVE=prod`는 compose에 고정되어 있다. 프로파일이 빠지면 앱이 `local`(H2, 인증 꺼짐)로 뜨므로 지우지 않는다.
+- 예전 방식(`git archive`를 풀어 둔 상태)에서 넘어오는 경우: `deploy/.env`와 `backups/`만 남기고 `apps/` 등 소스는 지워도 된다. 위 `chown`은 `backups/`를 건드리지 않는다 (root 전용으로 둔다).
 
-### 1-4. OTP 첫 등록 (기동 전에)
+### 1-3. GitHub 설정
 
-`TOTP_SECRET`이 비어 있으면 api가 기동하지 않는다. 먼저 이미지를 빌드하고, 같은 이미지로 일회성 시크릿 생성기(`com.lotterypicker.auth.TotpSetup`, Gradle의 `totpSetup` 태스크와 같은 클래스)를 실행한다. DB에는 접속하지 않는다.
+이 저장소(`withbbang/lottery-picker`)의 Settings → Secrets and variables → Actions → **Secrets 탭 → Repository secrets**에 네 개를 등록한다. 값은 chat-app에 넣은 것과 같다. GitHub은 등록된 시크릿을 다시 보여 주지 않으므로 원래 값(키 파일 등)에서 다시 입력한다.
+
+| 이름 | 값 |
+|---|---|
+| `NAS_HOST` | NAS 공인 주소 (도메인 또는 IP) |
+| `NAS_SSH_PORT` | 배포용 SSH 포트 |
+| `NAS_SSH_USER` | `<배포계정>` |
+| `NAS_SSH_KEY` | 배포용 개인키 전체 (`-----BEGIN ... END ...-----` 포함) |
+
+CLI로 넣어도 된다 (값은 프롬프트나 파일로 넘긴다):
 
 ```bash
-dc build
-dc run --rm --no-deps --entrypoint java api -cp app.jar com.lotterypicker.auth.TotpSetup
+gh secret set NAS_HOST
+gh secret set NAS_SSH_PORT
+gh secret set NAS_SSH_USER
+gh secret set NAS_SSH_KEY < ~/.ssh/<배포용 개인키>
 ```
 
-출력:
+- Environment secrets에 넣으면 이 워크플로가 읽지 못한다. 비어 있으면 deploy 잡이 **이름만** 출력하고 멈춘다.
+- 배포 폴더를 바꿀 때만 Variables 탭에 `NAS_DEPLOY_DIR`를 둔다 (기본 `/volume1/docker/lottery-picker`).
 
-```
-Picked up JAVA_TOOL_OPTIONS: ...        ← JVM 안내 문구, 무시
-TOTP_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-otpauth://totp/lottery-picker?secret=XXXX...&issuer=lottery-picker
-```
+### 1-4. 첫 실행과 OTP 등록
 
-1. `TOTP_SECRET=...` 줄의 값을 `deploy/.env`의 `TOTP_SECRET`에 넣는다.
-2. OTP 앱(Google Authenticator 등)에 등록한다. 둘 중 하나:
+`TOTP_SECRET`이 비어 있으면 api가 기동하지 않으므로, 워크플로는 `.env`의 `TOTP_SECRET`이 비어 있으면 **배포 전에 멈춘다**. 첫 실행은 이미지를 GHCR에 올리고 `deploy/`를 NAS에 복사한 뒤 여기서 멈추는 것이 정상이다.
+
+1. GitHub → Actions → **deploy** → Run workflow (브랜치 `master`). build 잡 2개가 성공하고, deploy 잡이 `TOTP_SECRET 이 비어 있습니다`로 실패한다.
+2. NAS에서 방금 올라간 api 이미지를 받아 일회성 시크릿 생성기(`com.lotterypicker.auth.TotpSetup`, Gradle의 `totpSetup` 태스크와 같은 클래스)를 실행한다. DB에는 접속하지 않는다.
+   ```bash
+   cd /volume1/docker/lottery-picker
+   dc pull api                 # IMAGE_TAG가 비어 있으면 :latest
+   dc run --rm --no-deps --entrypoint java api -cp app.jar com.lotterypicker.auth.TotpSetup
+   ```
+   출력:
+   ```
+   Picked up JAVA_TOOL_OPTIONS: ...        ← JVM 안내 문구, 무시
+   TOTP_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   otpauth://totp/lottery-picker?secret=XXXX...&issuer=lottery-picker
+   ```
+3. `TOTP_SECRET=...` 줄의 값을 `deploy/.env`의 `TOTP_SECRET`에 넣는다.
+4. OTP 앱(Google Authenticator 등)에 등록한다. 둘 중 하나:
    - **설정 키 직접 입력**: 계정 이름 `lottery-picker`, 키는 위 시크릿, 유형 "시간 기준".
    - QR로 등록하려면 Mac에서 `brew install qrencode` 후 `qrencode -t ansiutf8 'otpauth://...'`로 터미널에 QR을 띄운다. 시크릿을 온라인 QR 생성 사이트에 넣지 않는다.
-3. 출력이 남은 터미널은 닫는다. 시크릿은 `deploy/.env`와 OTP 앱에만 있어야 한다.
+5. 출력이 남은 터미널은 닫는다. 시크릿은 `deploy/.env`와 OTP 앱에만 있어야 한다.
+6. GitHub Actions의 실패한 실행에서 **Re-run failed jobs** (또는 Run workflow를 다시). 이번에는 pull → up까지 간다.
 
-시크릿을 잃어버렸거나 바꿀 때도 같은 절차 후 `dc up -d`를 하면 된다. 시크릿이 바뀌면 기동 시 이전 세션과 잠금이 모두 지워진다.
+- 1번 전에 시크릿을 만들어 두고 싶으면 Mac에서 `cd apps/api && ./gradlew -q totpSetup`으로 같은 출력을 얻을 수 있다. 그러면 첫 실행이 바로 배포까지 간다.
+- 시크릿을 잃어버렸거나 바꿀 때는 2~5 후 `dc up -d`를 하면 된다. 시크릿이 바뀌면 기동 시 이전 세션과 잠금이 모두 지워진다.
 
-### 1-5. 기동
+### 1-5. 기동 확인
+
+첫 배포는 HDD에서 mysql 초기화(수 분) → api 기동 → web 순서라 deploy 잡이 몇 분 걸린다. 끝나면 NAS에서:
 
 ```bash
-dc up -d --build
 dc ps                              # mysql, api가 (healthy), web이 Up
 curl -s localhost:13000/api/v1/health    # {"success":true,"data":{"status":"UP"}}
 curl -s -o /dev/null -w '%{http_code}\n' localhost:13000/api/v1/rounds   # 401
@@ -142,8 +206,9 @@ dig +short lottery-picker.o-r.kr     # 공인 IP가 나와야 한다
 |---|---|---|
 | TCP 80 | NAS 내부 IP:80 | Let's Encrypt 발급·갱신 (HTTP-01) |
 | TCP 443 | NAS 내부 IP:443 | 서비스 |
+| TCP `NAS_SSH_PORT` | NAS 내부 IP:`NAS_SSH_PORT` | GitHub Actions 배포 (chat-app과 같이 씀, 이미 있으면 그대로) |
 
-이 두 개 외에는 추가하지 않는다. 기존에 5000/5001/22 등을 열어 둔 규칙이 있으면 이번 기회에 닫는 것을 권한다.
+이 세 개 외에는 추가하지 않는다. GitHub Actions 러너는 매번 다른 IP에서 접속하므로 SSH 포트는 소스 IP로 좁힐 수 없다. 기존에 5000/5001 등을 열어 둔 규칙이 있으면 이번 기회에 닫는 것을 권한다.
 
 ### 2-3. 인증서
 
@@ -177,17 +242,22 @@ DSM 제어판 → 로그인 포털 → 고급 → 역방향 프록시 → 생성
 
 - 휴대폰 **와이파이를 끄고** LTE/5G로 `https://lottery-picker.o-r.kr` 접속 → 자물쇠 표시, OTP 로그인 성공, 새로고침 후에도 로그인 유지.
   - 집 와이파이에서는 공유기가 NAT 루프백을 지원하지 않으면 도메인 접속이 안 될 수 있다. 바깥 망으로 확인한다.
-- 바깥 망에서 아래가 **열리지 않아야** 한다: `http://<공인 IP>:13000`, `:3306`, `:8080`, `:5000`, `:5001`, `:22`.
+- 바깥 망에서 아래가 **열리지 않아야** 한다: `http://<공인 IP>:13000`, `:3306`, `:8080`, `:5000`, `:5001` (그리고 `NAS_SSH_PORT`가 22가 아니면 `:22`).
+- 바깥 망에서 SSH 포트는 열려 있되 **비밀번호 로그인은 거절돼야** 한다 (2-7의 5번):
+  ```bash
+  ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password -p <NAS_SSH_PORT> <배포계정>@<NAS_HOST>
+  # Permission denied (publickey) 류로 끝나면 된다. 비밀번호를 물으면 2-7의 5번을 본다.
+  ```
 - 바깥 망에서 아래 주소에 **DSM 로그인 화면이나 DSM 관련 페이지가 보이지 않아야** 한다 (2-7).
   - `http://<공인 IP>/`, `https://<공인 IP>/` (도메인 없이 IP로)
   - `http://lottery-picker.o-r.kr/` (80, 인증서 발급용으로 열어 둔 포트)
 
 ### 2-7. DSM 보호 (반드시)
 
-80·443을 NAS로 넘기면, Host가 `lottery-picker.o-r.kr`이 아닌 요청(IP 직접 접속, 스캐너 등)은 모두 DSM의 기본 nginx가 받는다. 80과 443 둘 다 해당한다. 그래서 아래는 조건 없이 모두 해 둔다.
+80·443을 NAS로 넘기면, Host가 `lottery-picker.o-r.kr`이 아닌 요청(IP 직접 접속, 스캐너 등)은 모두 DSM의 기본 nginx가 받는다. 80과 443 둘 다 해당한다. 배포용 SSH 포트도 인터넷 전체에 열려 있다. 그래서 아래는 조건 없이 모두 해 둔다.
 
 1. **관리자 계정 2단계 인증**: 관리자 권한이 있는 모든 계정에서 개인 → 보안 → 2단계 인증을 켠다.
-2. **자동 차단**: 제어판 → 보안 → 보호 → 자동 차단 사용 (예: 5분 안에 로그인 10회 실패 시 차단).
+2. **자동 차단**: 제어판 → 보안 → 보호 → 자동 차단 사용 (예: 5분 안에 로그인 10회 실패 시 차단). SSH 로그인 실패에도 적용된다.
 3. **기본 `admin` 계정 비활성화**: 제어판 → 사용자 및 그룹 → `admin` → 비활성화. 이미 비활성이면 그대로 둔다.
 4. **방화벽**: 제어판 → 보안 → 방화벽 → 방화벽 사용, 프로필 규칙을 위에서부터 이 순서로 만든다.
 
@@ -195,37 +265,56 @@ DSM 제어판 → 로그인 포털 → 고급 → 역방향 프록시 → 생성
    |---|---|---|---|
    | 1 | 모두 | 집 LAN 서브넷 (예: `192.168.0.0/24`, 공유기 설정에서 확인) | 허용 |
    | 2 | TCP 80, 443 | 모두 | 허용 |
+   | 3 | TCP `NAS_SSH_PORT` | 모두 | 허용 (GitHub Actions 배포, IP가 매번 바뀜) |
    | — | 규칙에 없는 요청 | | 거부 |
 
-   - 결과적으로 DSM 5000/5001, SSH 22, NAS의 다른 서비스(3000, 8080 등)는 LAN에서만 열린다.
+   - 결과적으로 DSM 5000/5001, NAS의 다른 서비스(3000, 8080 등)는 LAN에서만 열린다. SSH는 `NAS_SSH_PORT`만 바깥에서 열린다.
+   - SSH 포트를 LAN 전용으로 막으면 이 저장소와 chat-app의 자동 배포가 모두 실패한다.
+   - chat-app 배포로 이미 같은 규칙이 있으면 그대로 둔다.
    - 서브넷을 잘못 넣으면 NAS에 못 들어갈 수 있다. LAN에서 DSM 창을 하나 열어 둔 채로 적용하고, 새 창으로 접속되는지 확인한 뒤 닫는다.
 5. **DSM 로그인 페이지가 80/443에 나오는지 확인**: 제어판 → 로그인 포털 → DSM 탭(웹 서비스 포트, 사용자 지정 도메인, HTTP→HTTPS 자동 리디렉션)과 고급 탭을 확인한다. DSM 버전·설치 패키지(Web Station 등)에 따라 다르므로 동작을 짐작하지 말고 2-6의 바깥 망 확인으로 판단한다.
    - IP로 접속했을 때 DSM 로그인 화면이 뜨거나 `:5000`/`:5001`로 리디렉션되면, DSM 탭의 사용자 지정 도메인·리디렉션 설정을 끄고 다시 확인한다.
    - 그래도 DSM 페이지가 보이면 1~4가 켜져 있는지 다시 확인한다. 방화벽 4번이 있으면 리디렉션돼도 5000/5001은 바깥에서 열리지 않는다.
+6. **SSH는 키로만**: 바깥에 열린 SSH 포트로 비밀번호 추측이 들어온다. 배포 계정은 키 로그인만 쓰므로 비밀번호 로그인은 막혀 있는 편이 좋다. 2-6의 `ssh -o PubkeyAuthentication=no ...`로 확인한다.
+   - 비밀번호를 묻는다면, DSM 버전에 따라 설정 위치가 다르므로 짐작하지 말고 확인한다: DSM 화면(터미널 및 SNMP 등)에 해당 옵션이 있는지, 없으면 `/etc/ssh/sshd_config`의 `PasswordAuthentication no` 후 SSH 서비스 재시작을 검토한다. 이 파일은 DSM 업데이트 때 되돌아갈 수 있으므로 업데이트 뒤에 2-6의 확인을 다시 한다.
+   - 바꾸기 전에 다른 터미널에서 키 로그인 세션을 하나 열어 둔다. 키 로그인이 안 되는 상태에서 막으면 NAS에 SSH로 못 들어간다 (DSM 웹은 LAN에서 계속 쓸 수 있다).
+   - 비밀번호 로그인을 막지 못하면 배포 계정의 비밀번호를 길게 두고 2(자동 차단)를 반드시 켜 둔다.
 
----
 
 ## 3. 다시 배포 (업데이트)
 
-```bash
-# Mac
-git archive --format=tar.gz -o lottery-picker.tar.gz master
-scp -O lottery-picker.tar.gz <NAS계정>@<NAS 내부 IP>:~/
+평소 흐름(피처 → `dev` → `master` 병합, `git push origin dev master`)대로 `master`에 푸시하면 끝이다. `apps/**`, `deploy/**`, 워크플로 파일이 바뀐 푸시만 배포한다 (문서만 바뀌면 배포하지 않는다).
 
-# NAS
-cd /volume1/docker/lottery-picker
-sudo tar -xzf ~/lottery-picker.tar.gz -C /volume1/docker/lottery-picker && rm ~/lottery-picker.tar.gz
-dc up -d --build
-sudo docker image prune -f         # 이전 빌드의 이름 없는 이미지 정리
+- 진행은 GitHub → Actions → deploy에서 본다. 끝나면 NAS에서 `dc ps`로 확인.
+- 다시 돌리고 싶을 때(실패 후 NAS 쪽을 고쳤을 때 등): Actions → deploy → **Run workflow** (`master`).
+- DB 스키마는 api 기동 시 Flyway가 올린다. 큰 변경 전에는 NAS에서 `sudo bash deploy/backup.sh`를 먼저 돌린다.
+
+### 되돌리기
+
+배포된 커밋 SHA는 `deploy/.env`의 `IMAGE_TAG`에 있고, 이전 SHA는 GitHub Actions 실행 목록이나 `git log master`에서 찾는다. GHCR에 SHA 태그가 남아 있으므로 NAS에 이미지가 없어도 받아 온다.
+
+```bash
+vi deploy/.env             # IMAGE_TAG=<되돌릴 커밋 SHA 전체>
+dc up -d                   # 없는 이미지는 받아 와서 재생성
 ```
 
-- 압축 해제는 Git에 있는 파일만 덮어쓴다. `deploy/.env`와 `backups/`는 그대로 남는다.
-- Git에서 지운 파일은 NAS에 남는다. 문제가 되면 `.env`·`backups/`를 제외하고 지운 뒤 다시 푼다.
-- DB 스키마는 api 기동 시 Flyway가 올린다. 큰 변경 전에는 `sudo bash deploy/backup.sh`를 먼저 돌린다.
+- 다음 `master` 배포가 `IMAGE_TAG`를 다시 덮어쓴다. 고친 커밋을 푸시하면 자연스럽게 앞으로 돌아온다.
+- Flyway 마이그레이션은 앞으로만 간다. 스키마를 바꾼 커밋보다 이전으로 되돌리면 api가 기동하지 않을 수 있다. 그때는 4장의 덤프로 DB를 되돌린다.
+
+### 오래된 이미지 정리
+
+배포마다 `:<SHA>` 태그 이미지가 하나씩 남는다 (`image prune -f`는 태그 없는 이미지만 지운다). 가끔 확인해서 지금 쓰는 것과 되돌릴 후보만 남긴다.
+
+```bash
+sudo docker images 'ghcr.io/withbbang/lottery-picker-*'
+sudo docker rmi ghcr.io/withbbang/lottery-picker-api:<오래된 SHA> ghcr.io/withbbang/lottery-picker-web:<오래된 SHA>
+```
 
 ---
 
 ## 4. 백업 (Step 6)
+
+`deploy/backup.sh`, `deploy/restore-check.sh`는 따로 보낼 필요 없다. 배포 워크플로가 `deploy/`를 복사할 때 같이 NAS에 들어가고, 매번 Git의 최신 내용으로 덮어쓴다. `backups/`는 워크플로가 건드리지 않는다.
 
 `deploy/backup.sh`가 하는 일:
 
@@ -297,7 +386,7 @@ dc start api web
 ## 5. 재부팅과 1주 운영 (Step 7)
 
 - DSM 패키지 센터에서 Container Manager가 실행 중이면, 재부팅 후 Docker가 올라오면서 `unless-stopped` 컨테이너가 자동으로 다시 뜬다. `dc stop`으로 멈춘 컨테이너는 재부팅 후에도 멈춘 상태로 남는다.
-- 재부팅 때는 Docker가 컨테이너를 한꺼번에 다시 띄우므로 `depends_on`의 `service_healthy`(mysql 준비 후 api 기동)가 지켜지지 않는다. api가 mysql보다 먼저 준비되면 DB 접속에 실패해 종료하고, 재시작 정책으로 다시 뜬다. **재부팅 직후 api가 한두 번 재시작되는 것은 정상이다.** 몇 분 뒤 `dc ps`에서 api가 `(healthy)`면 된다. 계속 재시작되면 `dc logs --tail 100 api`로 원인을 본다.
+- 재부팅 때는 Docker가 컨테이너를 한꺼번에 다시 띄우므로 `depends_on`의 `service_healthy`(mysql 준비 후 api 기동)가 지켜지지 않는다. api가 mysql보다 먼저 준비되면 DB 접속에 실패해 종료하고, 재시작 정책으로 다시 뜬다. web도 api보다 먼저 떠서 잠시 `/api/*`가 502를 낼 수 있다. **재부팅 직후 api가 한두 번 재시작되는 것은 정상이다.** 몇 분 뒤 `dc ps`에서 api가 `(healthy)`면 된다. 계속 재시작되면 `dc logs --tail 100 api`로 원인을 본다.
 - 재부팅 후 확인: `dc ps`, `curl -s localhost:13000/api/v1/health`, 휴대폰에서 HTTPS 접속.
 - 7일 동안 확인: 매일 17:00 텔레그램 추천 알림, 토요일 추첨 후 결과 알림, 비교 화면.
 
@@ -333,14 +422,17 @@ NAS 여유 메모리(약 4 GiB)를 고려해 상한을 두었다.
 
 ## 8. 로컬에서 같은 구성 확인 (개발용)
 
-Mac에서 확인할 때는 프로젝트 이름과 `.env`를 따로 쓰고, 동행복권 호출을 막는다.
+Mac에서 확인할 때는 프로젝트 이름과 `.env`를 따로 쓰고, 동행복권 호출을 막는다. GHCR 이미지 대신 소스에서 빌드하도록 `compose.build.yml`을 겹친다.
 
 ```bash
 # 저장소 밖의 임시 파일에 키를 채운다. SCHEDULING_ENABLED=false,
 # TOTP_SECRET=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ (RFC 6238 테스트 값)
-docker compose -p lp-deploy-test -f deploy/compose.yml --env-file <임시 env> up -d --build
+alias ldc='docker compose -p lp-deploy-test -f deploy/compose.yml -f deploy/compose.build.yml --env-file <임시 env>'
+ldc up -d --build
 curl -s localhost:13000/api/v1/health
-docker compose -p lp-deploy-test -f deploy/compose.yml --env-file <임시 env> down -v --rmi local
+ldc down -v --rmi local
+# 빌드한 이미지는 ghcr.io/... 이름으로 태그된다 (푸시하지 않는다). 남아 있으면 직접 지운다:
+docker images 'ghcr.io/withbbang/lottery-picker-*'
 ```
 
 `backup.sh`, `restore-check.sh`도 `ENV_FILE=<임시 env> COMPOSE_PROJECT=lp-deploy-test BACKUP_DIR=<임시 폴더>`로 같은 스택에 돌릴 수 있다.

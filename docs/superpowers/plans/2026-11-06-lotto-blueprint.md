@@ -625,11 +625,11 @@ Run: `docker compose -f deploy/compose.yml up --build` 후 `curl -s localhost:13
 
 - [ ] **Step 4: 서버에 배포하고 OTP를 등록한다**
 
-NAS에는 git이 없으므로 Mac에서 `git archive`로 `master`를 묶어 `scp`로 보내고 NAS에서 풀어 `docker compose -f deploy/compose.yml --env-file deploy/.env up -d --build`로 실행한다(절차는 `deploy/README.md`). 기동 전에 `totpSetup` 출력으로 시크릿을 넣는다. (2026-11-09 변경) 사용자가 OTP 앱에 등록한 뒤 로그인을 확인한다.
+`master` 푸시(또는 수동 실행)로 GitHub Actions(`.github/workflows/deploy.yml`)가 api·web 이미지를 `linux/amd64`로 빌드해 GHCR(`ghcr.io/withbbang/lottery-picker-{api,web}:<SHA>`)에 올리고, SSH로 NAS의 `/volume1/docker/lottery-picker`에 `deploy/`를 복사한 뒤 `deploy/.env`에 `IMAGE_TAG=<SHA>`를 써 넣고 `docker compose -f deploy/compose.yml --env-file deploy/.env pull` → `up -d`로 실행한다. NAS에는 소스가 가지 않는다(절차는 `deploy/README.md`). 첫 실행 때는 이미지를 받은 뒤 같은 이미지의 `TotpSetup`으로 시크릿을 만들어 `.env`에 넣고 배포를 다시 돌린다. (2026-11-09 변경) 사용자가 OTP 앱에 등록한 뒤 로그인을 확인한다.
 
 - [ ] **Step 5: HTTPS 경로를 연결한다**
 
-DSM 역방향 프록시로 `https://lottery-picker.o-r.kr`(443)을 `http://127.0.0.1:13000`에 연결하고 DSM에서 Let's Encrypt 인증서를 발급한다. 웹은 `127.0.0.1:13000`에만 공개하고, 공유기는 80·443만 NAS로 넘긴다. Expected: 집 밖 네트워크의 휴대폰에서 HTTPS 주소로 OTP 로그인 성공, 공유기에 연 포트는 80·443뿐. (2026-11-09 변경: 사용자 결정으로 Cloudflare Tunnel 대신 DSM 역방향 프록시)
+DSM 역방향 프록시로 `https://lottery-picker.o-r.kr`(443)을 `http://127.0.0.1:13000`에 연결하고 DSM에서 Let's Encrypt 인증서를 발급한다. 웹은 `127.0.0.1:13000`에만 공개하고, 공유기는 80·443과 배포용 SSH 포트만 NAS로 넘긴다. Expected: 집 밖 네트워크의 휴대폰에서 HTTPS 주소로 OTP 로그인 성공, 공유기에 연 포트는 80·443과 배포용 SSH 포트(키 로그인만)뿐. (2026-11-09 변경: 사용자 결정으로 Cloudflare Tunnel 대신 DSM 역방향 프록시)
 
 - [ ] **Step 6: 백업과 복구를 확인한다**
 

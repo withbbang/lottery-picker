@@ -1,5 +1,8 @@
 # 집 서버(Synology NAS) 운영 구성. 사용법은 deploy/README.md.
-#   docker compose -f deploy/compose.yml --env-file deploy/.env up -d --build
+#   docker compose -f deploy/compose.yml --env-file deploy/.env up -d
+# api·web 이미지는 GitHub Actions(.github/workflows/deploy.yml)가 GHCR에 올린 것을 받는다.
+# IMAGE_TAG(커밋 SHA)는 워크플로가 deploy/.env 에 써 넣는다. 비어 있으면 latest.
+# 로컬에서 소스로 빌드할 때만 compose.build.yml 을 겹친다 (README 8장). NAS 에서는 겹치지 않는다.
 # 호스트에 공개하는 포트는 web의 127.0.0.1:13000 하나뿐이다.
 # HTTPS는 DSM 역방향 프록시가 받아 localhost:13000으로 넘긴다.
 
@@ -35,13 +38,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      # NAS HDD 에서 첫 초기화(데이터 디렉터리 생성)는 2분이 넘는다. 그동안 실패는 세지 않는다 (chat-app 실측).
+      start_period: 300s
     mem_limit: 768m
     logging: *logging
     restart: unless-stopped
 
   api:
-    build: ../apps/api
+    image: ghcr.io/withbbang/lottery-picker-api:${IMAGE_TAG:-latest}
     environment:
       # 프로파일이 없으면 local(H2, 인증 꺼짐)로 뜬다. 반드시 prod.
       SPRING_PROFILES_ACTIVE: prod
@@ -69,16 +73,16 @@ services:
     restart: unless-stopped
 
   web:
-    build:
-      context: ../apps/web
-      args:
-        API_INTERNAL_URL: http://api:8080
+    # API_INTERNAL_URL=http://api:8080 은 이미지 빌드 때 고정된다 (워크플로의 build-args).
+    image: ghcr.io/withbbang/lottery-picker-web:${IMAGE_TAG:-latest}
     environment:
       TZ: Asia/Seoul
     ports:
       - "127.0.0.1:13000:3000"
+    # api가 healthy가 된 뒤에 web을 띄운다 (그전에는 /api/* 가 502).
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     mem_limit: 384m
     logging: *logging
     restart: unless-stopped

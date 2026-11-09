@@ -1,0 +1,140 @@
+# master push → 이미지 빌드/푸시(GHCR) → NAS에 deploy/ 복사 → compose pull & up
+# 절차와 NAS 준비는 deploy/README.md 1장. chat-app 의 deploy.yml 과 같은 패턴이다.
+#
+# 필요한 GitHub 설정 (Settings → Secrets and variables → Actions)
+#   Secrets   : NAS_HOST, NAS_SSH_PORT, NAS_SSH_USER, NAS_SSH_KEY  (Repository secrets 탭)
+#   Variables : NAS_DEPLOY_DIR — 선택. 비우면 /volume1/docker/lottery-picker  (Repository variables 탭)
+#
+# NAS 사전 준비 (chat-app 과 같은 배포 계정이면 2·3·5는 이미 되어 있다)
+#   1. DSM → 제어판 → 터미널 및 SNMP → SSH 활성화 (포트 변경 권장)
+#   2. 배포 계정 ~/.ssh/authorized_keys 에 공개키 등록
+#   3. docker login ghcr.io -u <GH_OWNER> -p <read:packages PAT>  (워크플로가 만든 패키지는 처음에 비공개)
+#   4. <NAS_DEPLOY_DIR>/deploy/.env 준비 (deploy/.env.example 참고, TOTP_SECRET 포함)
+#   5. Synology 는 docker.sock 이 root:root 660 이라 sudo 필요(visudo 없음):
+#      sudo sh -c 'echo "<배포계정> ALL=(root) NOPASSWD: /usr/local/bin/docker" > /etc/sudoers.d/<배포계정> && chmod 440 /etc/sudoers.d/<배포계정>'
+#      확인: ssh <배포계정>@NAS 'sudo -n /usr/local/bin/docker ps'
+
+name: deploy
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "apps/**"
+      - "deploy/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - app: web
+            # rewrites 대상은 next build 시점에 routes manifest로 고정된다 (apps/web/next.config.ts)
+            build_args: API_INTERNAL_URL=http://api:8080
+          - app: api
+            build_args: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image name (GHCR는 소문자만 허용)
+        id: img
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          echo "name=ghcr.io/${OWNER,,}/lottery-picker-${{ matrix.app }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: apps/${{ matrix.app }}
+          push: true
+          # Synology DS1520+ (x86_64)
+          platforms: linux/amd64
+          build-args: ${{ matrix.build_args }}
+          tags: |
+            ${{ steps.img.outputs.name }}:latest
+            ${{ steps.img.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,scope=${{ matrix.app }},mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_DIR: ${{ vars.NAS_DEPLOY_DIR || '/volume1/docker/lottery-picker' }}
+    steps:
+      - name: Check required secrets (값은 출력하지 않음 — 이름만)
+        env:
+          NAS_HOST: ${{ secrets.NAS_HOST }}
+          NAS_SSH_PORT: ${{ secrets.NAS_SSH_PORT }}
+          NAS_SSH_USER: ${{ secrets.NAS_SSH_USER }}
+          NAS_SSH_KEY: ${{ secrets.NAS_SSH_KEY }}
+        run: |
+          missing=""
+          for n in NAS_HOST NAS_SSH_PORT NAS_SSH_USER NAS_SSH_KEY; do
+            [ -z "${!n}" ] && missing="$missing $n"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::비어 있는 Repository secret:$missing — Settings → Secrets and variables → Actions → Secrets 탭 → Repository secrets 에 등록(Environment secrets 는 이 job 에서 안 읽힘)"
+            exit 1
+          fi
+          echo "secrets OK (NAS_SSH_KEY ${#NAS_SSH_KEY} chars, DEPLOY_DIR=$DEPLOY_DIR)"
+
+      - uses: actions/checkout@v4
+
+      # deploy/ 디렉터리째 보내 <DEPLOY_DIR>/deploy/ 에 풀린다. deploy/.env 는 gitignore라 체크아웃에 없고,
+      # rm: false 라 대상의 기존 파일(deploy/.env, backups/)은 지우지 않는다. tar 로 Git에 있는 파일만 덮어쓴다.
+      - name: Copy deploy/ to NAS
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.NAS_HOST }}
+          port: ${{ secrets.NAS_SSH_PORT }}
+          username: ${{ secrets.NAS_SSH_USER }}
+          key: ${{ secrets.NAS_SSH_KEY }}
+          source: "deploy"
+          target: ${{ env.DEPLOY_DIR }}
+          rm: false
+          overwrite: true
+
+      - name: Pull & restart
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.NAS_HOST }}
+          port: ${{ secrets.NAS_SSH_PORT }}
+          username: ${{ secrets.NAS_SSH_USER }}
+          key: ${{ secrets.NAS_SSH_KEY }}
+          # 첫 배포는 HDD 에서 mysql 초기화(최대 수 분) → api 기동 → web 순서를 기다린다
+          command_timeout: 20m
+          script: |
+            set -e
+            export PATH=/usr/local/bin:$PATH        # Synology 비대화형 SSH 는 /usr/local/bin(docker) 이 PATH 에 없다
+            cd ${{ env.DEPLOY_DIR }}
+            # .env 가 없으면 아래 echo >> 가 IMAGE_TAG 한 줄짜리 .env 를 만들어 버린다. 먼저 막는다.
+            if [ ! -f deploy/.env ]; then echo "::error::deploy/.env 가 없습니다 — deploy/README.md 1장"; exit 1; fi
+            # TOTP_SECRET 이 비어 있으면 api 가 기동하지 않는다 (README 1-4)
+            if ! grep -q '^TOTP_SECRET=..*' deploy/.env; then echo "::error::deploy/.env 의 TOTP_SECRET 이 비어 있습니다 — deploy/README.md 1-4"; exit 1; fi
+            # IMAGE_TAG 는 .env 에 써 넣는다 — sudo 가 환경변수를 초기화해도 compose 가 읽는다
+            if grep -q '^IMAGE_TAG=' deploy/.env; then sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${{ github.sha }}/" deploy/.env; else echo "IMAGE_TAG=${{ github.sha }}" >> deploy/.env; fi
+            # docker.sock 이 root:root 660 이면 sudoers NOPASSWD(상단 주석 5번) 경유. 비밀번호를 요구하면 즉시 실패(-n)
+            if docker ps >/dev/null 2>&1; then DOCKER=docker; else DOCKER="sudo -n docker"; fi
+            DC="$DOCKER compose -f deploy/compose.yml --env-file deploy/.env"
+            $DC pull api web
+            $DC up -d --remove-orphans
+            $DOCKER image prune -f
+            $DC ps
