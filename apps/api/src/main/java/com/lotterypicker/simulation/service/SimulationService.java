@@ -63,7 +63,7 @@ public class SimulationService {
 
 	public static final long BASE_SEED = 20_261_106L;
 
-	public static final String SCOPE_NOTE = "전략의 번호 추출 규칙만 평가합니다. 고정·제외 번호와 인기 조합·중복 제약은 적용하지 않습니다.";
+	public static final String SCOPE_NOTE = "실제 추천에서 거르는 고정·제외 번호, 많은 사람이 고르는 조합, 다른 줄과 겹치는 번호는 적용하지 않고 전략이 번호를 고르는 방식만 시험했습니다.";
 
 	private static final Map<StrategyType, LineStrategy> STRATEGIES = Stream
 		.of(new RecentHotStrategy(), new LongColdStrategy(), new AllTimeStrategy(), new PairStrategy(),

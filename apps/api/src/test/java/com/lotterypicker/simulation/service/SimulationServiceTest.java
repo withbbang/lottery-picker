@@ -374,7 +374,7 @@ class SimulationServiceTest {
 		assertThat(response.computedAt().toString()).isEqualTo("2026-11-09T10:00+09:00");
 		assertThat(response.theoryAtLeastFifthRate()).isEqualTo(194_130d / 8_145_060d);
 		assertThat(response.scopeNote())
-			.isEqualTo("전략의 번호 추출 규칙만 평가합니다. 고정·제외 번호와 인기 조합·중복 제약은 적용하지 않습니다.");
+			.isEqualTo("실제 추천에서 거르는 고정·제외 번호, 많은 사람이 고르는 조합, 다른 줄과 겹치는 번호는 적용하지 않고 전략이 번호를 고르는 방식만 시험했습니다.");
 		assertThat(response.strategies()).hasSize(StrategyType.values().length);
 	}
 
