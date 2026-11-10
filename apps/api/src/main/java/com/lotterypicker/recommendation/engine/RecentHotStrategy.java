@@ -4,7 +4,8 @@ import java.util.Random;
 
 public class RecentHotStrategy implements LineStrategy {
 
-	private static final int WINDOW = 50;
+	/** 최근 빈도의 기준 회차 수. 번호 통계의 최근 지표도 이 값을 쓴다. */
+	public static final int WINDOW = 50;
 
 	@Override
 	public StrategyType type() {
