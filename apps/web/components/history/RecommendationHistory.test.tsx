@@ -19,6 +19,8 @@ function line(
     numbers: [1, 2, 3, 4, 30, 45],
     evidence: ["근거"],
     relaxation: "NONE",
+    evidenceNumbers: [],
+    statsMetric: null,
     matchCount: null,
     prizeRank: null,
     matchedNumbers: null,
@@ -69,9 +71,7 @@ describe("RecommendationHistory", () => {
     renderHistory();
 
     // then
-    expect(
-      await screen.findByText(/아직 추천이 없습니다/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/아직 추천이 없습니다/)).toBeInTheDocument();
   });
 
   it("shows each day with its round and the server's per-line results", async () => {

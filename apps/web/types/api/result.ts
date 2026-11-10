@@ -1,4 +1,5 @@
 import type { Relaxation, StrategyType } from "@/types/api/recommendation";
+import type { NumberMetric } from "@/types/api/statistics";
 
 export type PrizeRank =
   "FIRST" | "SECOND" | "THIRD" | "FOURTH" | "FIFTH" | "NONE";
@@ -29,6 +30,9 @@ export type RecommendationHistoryLineResponse = {
   numbers: number[];
   evidence: string[];
   relaxation: Relaxation;
+  /** 오늘 추천 응답과 같은 뜻. */
+  evidenceNumbers: number[];
+  statsMetric: NumberMetric | null;
   matchCount: number | null;
   prizeRank: PrizeRank | null;
   /** 당첨 본번호와 겹친 번호. 서버가 계산한다. 보너스는 넣지 않는다. */
