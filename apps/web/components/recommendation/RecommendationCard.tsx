@@ -198,9 +198,9 @@ function SlipLine({
           ▾
         </span>
       </button>
-      {/* 근거 상자는 공 줄의 폭을 넘지 않는다. w-0 min-w-full: 상자 글이 폭 계산에 끼지 않고 공 줄 폭만큼 펼쳐진다. */}
-      <div className="col-span-2 col-start-2 flex w-fit max-w-full flex-col gap-2.5">
-        <div className="flex flex-wrap items-center gap-1.5">
+      {/* 공 줄과 근거 상자는 칸 이름 열부터 용지 안쪽 폭을 다 쓴다(최근 당첨번호와 같은 배치). */}
+      <div className="col-span-full flex flex-col gap-2.5">
+        <div className="flex w-full items-center justify-between">
           {line.numbers.map((n) => (
             <LottoBall key={n} value={n} />
           ))}
@@ -208,7 +208,7 @@ function SlipLine({
         <ul
           id={evidenceId}
           hidden={!open}
-          className="flex w-0 min-w-full flex-col gap-1 rounded-md bg-paper px-3 py-2 text-sm text-muted"
+          className="flex w-full flex-col gap-1 rounded-md bg-paper px-3 py-2 text-sm text-muted"
         >
           {line.evidence.map((text, i) => (
             <li key={i}>{text}</li>
