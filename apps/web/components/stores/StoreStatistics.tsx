@@ -64,8 +64,14 @@ function RankSwitch({ params }: { params: StoreStatsParams }) {
 
 function AreaTrail({ params }: { params: StoreStatsParams }) {
   const { rank, region, district } = params;
-  const steps: { label: string; href: string | null }[] = [
+  // key는 단계 이름. 세종처럼 시·도와 시·군·구 이름이 같을 수 있다.
+  const steps: {
+    key: "all" | "region" | "district";
+    label: string;
+    href: string | null;
+  }[] = [
     {
+      key: "all",
       label: "전국",
       href:
         region === null
@@ -75,6 +81,7 @@ function AreaTrail({ params }: { params: StoreStatsParams }) {
   ];
   if (region !== null) {
     steps.push({
+      key: "region",
       label: region,
       href:
         district === null
@@ -83,13 +90,13 @@ function AreaTrail({ params }: { params: StoreStatsParams }) {
     });
   }
   if (district !== null) {
-    steps.push({ label: district, href: null });
+    steps.push({ key: "district", label: district, href: null });
   }
   return (
     <nav aria-label="지역 경로">
       <ol className="flex flex-wrap items-baseline gap-x-1.5 text-lg font-semibold">
         {steps.map((step, i) => (
-          <li key={step.label} className="flex items-baseline gap-x-1.5">
+          <li key={step.key} className="flex items-baseline gap-x-1.5">
             {i > 0 && (
               <span aria-hidden="true" className="text-muted">
                 ›

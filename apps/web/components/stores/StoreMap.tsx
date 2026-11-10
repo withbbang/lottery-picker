@@ -102,6 +102,8 @@ export function StoreMap({ pins }: { pins: StoreResponse[] }) {
     } else if (placed.length > 1) {
       map.fitBounds(L.latLngBounds(placed.map(({ point }) => point)), {
         padding: [24, 24],
+        // 핀이 모두 한 자리에 있으면 경계 크기가 0이라 최대 줌까지 들어간다. 핀 하나일 때만큼만 확대한다.
+        maxZoom: SINGLE_PIN_ZOOM,
         animate: false,
       });
     }

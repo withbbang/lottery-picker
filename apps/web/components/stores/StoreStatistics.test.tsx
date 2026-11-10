@@ -174,6 +174,30 @@ describe("StoreStatistics", () => {
     );
   });
 
+  it("shows a trail where region and district share a name", async () => {
+    // given: 세종은 시·도와 시·군·구가 모두 "세종"이다
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockResolvedValue(
+      respond({ ...seoul, districts: [{ name: "세종", count: 36 }] }),
+    );
+
+    // when
+    renderStats({ region: "세종", district: "세종" });
+
+    // then
+    const trail = await screen.findByRole("navigation", { name: "지역 경로" });
+    expect(within(trail).getByRole("link", { name: "세종" })).toHaveAttribute(
+      "href",
+      "/rounds/stores?region=%EC%84%B8%EC%A2%85",
+    );
+    expect(within(trail).getAllByText("세종")).toHaveLength(2);
+    const duplicateKeys = errors.mock.calls.filter(([message]) =>
+      String(message).includes("same key"),
+    );
+    expect(duplicateKeys).toEqual([]);
+    errors.mockRestore();
+  });
+
   it("hides the map for online sales", async () => {
     // given
     fetchMock.mockResolvedValue(
