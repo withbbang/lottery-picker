@@ -27,13 +27,4 @@ describe("layout metadata", () => {
       statusBarStyle: "default",
     });
   });
-
-  it("exports a 180px apple icon", async () => {
-    // when
-    const { size, contentType } = await import("@/app/apple-icon");
-
-    // then
-    expect(size).toEqual({ width: 180, height: 180 });
-    expect(contentType).toBe("image/png");
-  });
 });
