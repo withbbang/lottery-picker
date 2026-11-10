@@ -1,0 +1,10 @@
+# 생성물·의존성
+.next/
+node_modules/
+coverage/
+out/
+build/
+public/
+next-env.d.ts
+tsconfig.tsbuildinfo
+pnpm-lock.yaml

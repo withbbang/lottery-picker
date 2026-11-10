@@ -15,7 +15,8 @@
 ```bash
 # apps/web
 pnpm dev        # 개발 서버
-pnpm lint       # ESLint
+pnpm lint       # ESLint + Prettier 서식 검사
+pnpm format     # Prettier로 서식 정리 (.prettierrc.json)
 pnpm test       # Vitest (watch 아님, vitest run)
 pnpm build
 
