@@ -70,7 +70,7 @@ describe("RecommendationHistory", () => {
 
     // then
     expect(
-      await screen.findByText(/아직 지난 추천이 없습니다/),
+      await screen.findByText(/아직 추천이 없습니다/),
     ).toBeInTheDocument();
   });
 
@@ -117,7 +117,7 @@ describe("RecommendationHistory", () => {
     expect(
       within(days[0]).getByRole("link", { name: "1250회" }),
     ).toHaveAttribute("href", "/rounds/1250");
-    expect(within(days[0]).getByText("추첨 전")).toBeInTheDocument();
+    expect(within(days[0]).getByText("채점 전")).toBeInTheDocument();
     expect(within(days[1]).getByText("4등 당첨")).toBeInTheDocument();
     expect(within(days[1]).getByText("4개 일치")).toBeInTheDocument();
     expect(within(days[1]).getByText("4등")).toBeInTheDocument();
@@ -180,6 +180,40 @@ describe("RecommendationHistory", () => {
     expect(await screen.findByText("10월 30일")).toBeInTheDocument();
     expect(fetchMock.mock.lastCall?.[0]).toBe(
       "/api/v1/recommendations/history?page=1&size=7",
+    );
+  });
+
+  it("moves two pages when next is pressed twice while the next page is loading", async () => {
+    // given: 1페이지 이후 응답은 바로 오지 않는다
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    fetchMock.mockImplementation(async (url: string) => {
+      const page = Number(
+        new URL(url, "http://localhost").searchParams.get("page"),
+      );
+      if (page > 0) {
+        await gate;
+      }
+      return respond(
+        [{ date: `2026-10-0${page + 1}`, round: 1250, lines: [line({})] }],
+        page,
+        5,
+      );
+    });
+    renderHistory();
+    await screen.findByText("10월 1일");
+
+    // when
+    await userEvent.click(screen.getByRole("button", { name: "다음 페이지" }));
+    await userEvent.click(screen.getByRole("button", { name: "다음 페이지" }));
+    release();
+
+    // then
+    expect(await screen.findByText("10월 3일")).toBeInTheDocument();
+    expect(fetchMock.mock.lastCall?.[0]).toBe(
+      "/api/v1/recommendations/history?page=2&size=7",
     );
   });
 });

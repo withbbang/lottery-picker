@@ -11,7 +11,11 @@ function pageWindow(page: number, totalPages: number) {
   return Array.from({ length: end - start }, (_, i) => start + i);
 }
 
-/** 0부터 세는 페이지 이동 막대. 화면에는 1부터 보인다. */
+/**
+ * 0부터 세는 페이지 이동 막대. 화면에는 1부터 보인다.
+ * page는 응답의 페이지가 아니라 요청한 페이지(호출 쪽 상태)를 넘긴다. 다음 페이지를 불러오는 동안에도
+ * 연달아 누른 이동이 쌓이고 현재 표시가 바로 바뀐다.
+ */
 export function Pagination({
   page,
   totalPages,

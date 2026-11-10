@@ -58,7 +58,7 @@ export function RoundList() {
         ))}
       </ul>
       <Pagination
-        page={data.page}
+        page={page}
         totalPages={data.totalPages}
         onChange={setPage}
       />

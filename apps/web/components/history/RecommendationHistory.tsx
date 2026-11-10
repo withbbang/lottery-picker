@@ -43,7 +43,7 @@ type Verdict =
   | { kind: "lost" }
   | { kind: "won"; best: PrizeRank };
 
-/** 하루 용지의 결과. 한 줄이라도 채점 전이면 추첨 전으로 본다. */
+/** 하루 용지의 결과. 추첨 전이든 추첨 뒤 채점 대기든 한 줄이라도 채점 전이면 채점 전으로 본다. */
 function dayVerdict(lines: Line[]): Verdict {
   if (lines.some((l) => l.prizeRank === null)) {
     return { kind: "pending" };
@@ -91,8 +91,8 @@ export function RecommendationHistory() {
   if (data.items.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-rule px-4 py-6 text-muted">
-        아직 지난 추천이 없습니다. 추천은 매일 오후 5시에 만들어지고, 다음
-        날부터 여기에 쌓입니다.
+        아직 추천이 없습니다. 추천은 매일 오후 5시에 만들어지고 바로 여기에
+        쌓입니다.
       </p>
     );
   }
@@ -103,7 +103,7 @@ export function RecommendationHistory() {
         <DaySlip key={day.date} day={day} />
       ))}
       <Pagination
-        page={data.page}
+        page={page}
         totalPages={data.totalPages}
         onChange={setPage}
       />
@@ -153,7 +153,7 @@ function VerdictMark({ verdict }: { verdict: Verdict }) {
   }
   return (
     <span className="shrink-0 text-sm text-muted">
-      {verdict.kind === "pending" ? "추첨 전" : "낙첨"}
+      {verdict.kind === "pending" ? "채점 전" : "낙첨"}
     </span>
   );
 }
