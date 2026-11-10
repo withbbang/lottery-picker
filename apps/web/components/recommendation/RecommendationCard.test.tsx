@@ -204,13 +204,17 @@ describe("RecommendationCard", () => {
       {
         strategy: "COMBINED" as const,
         numbers: [7, 12, 24, 37, 39, 40],
-        evidence: ["7(최근 빈도) · 12(장기 미출현) · 24·39(번호 쌍) · 37(전체 빈도) · 40(최근 빈도·전체 빈도)"],
+        evidence: [
+          "7(최근 빈도) · 12(장기 미출현) · 24·39(번호 쌍) · 37(전체 빈도) · 40(최근 빈도·전체 빈도)",
+        ],
         relaxation: "NONE" as const,
       },
       {
         strategy: "COMBINED" as const,
         numbers: [7, 12, 24, 29, 37, 39],
-        evidence: ["7(최근 빈도) · 12(장기 미출현) · 24·39(번호 쌍) · 29(장기 미출현) · 37(전체 빈도)"],
+        evidence: [
+          "7(최근 빈도) · 12(장기 미출현) · 24·39(번호 쌍) · 29(장기 미출현) · 37(전체 빈도)",
+        ],
         relaxation: "NONE" as const,
       },
     ];
@@ -229,6 +233,12 @@ describe("RecommendationCard", () => {
     // then
     const slip = await screen.findByRole("region", { name: "근거 조합" });
     expect(within(slip).getAllByRole("article")).toHaveLength(2);
+    // 줄 제목은 번호를 붙여 구분한다
+    expect(
+      within(slip)
+        .getAllByRole("heading", { level: 2 })
+        .map((h) => h.textContent),
+    ).toEqual(["근거 조합 1", "근거 조합 2"]);
     expect(within(slip).getByText("40")).toBeInTheDocument();
     expect(screen.getAllByRole("article")).toHaveLength(7);
   });
@@ -335,7 +345,11 @@ describe("RecommendationCard", () => {
     renderCard();
 
     // then
-    expect(await screen.findByText("텔레그램 알림을 보내지 못했습니다. 번호는 여기서 확인하세요.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "텔레그램 알림을 보내지 못했습니다. 번호는 여기서 확인하세요.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("hides the warning unless the telegram send failed", async () => {
@@ -349,7 +363,11 @@ describe("RecommendationCard", () => {
 
     // then
     await screen.findAllByRole("article");
-    expect(screen.queryByText("텔레그램 알림을 보내지 못했습니다. 번호는 여기서 확인하세요.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "텔레그램 알림을 보내지 못했습니다. 번호는 여기서 확인하세요.",
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it("shows an empty message on 204", async () => {

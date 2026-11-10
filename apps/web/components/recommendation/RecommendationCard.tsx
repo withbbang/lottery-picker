@@ -146,7 +146,7 @@ function CombinedSlip({ lines }: { lines: Line[] }) {
           key={`${line.strategy}-${index}`}
           letter={gameLetter(index)}
           line={line}
-          showDescription={false}
+          title={`${STRATEGY_LABELS.COMBINED} ${index + 1}`}
         />
       ))}
     </section>
@@ -156,11 +156,12 @@ function CombinedSlip({ lines }: { lines: Line[] }) {
 function SlipLine({
   letter,
   line,
-  showDescription = true,
+  title,
 }: {
   letter: string;
   line: Line;
-  showDescription?: boolean;
+  /** 근거 조합처럼 같은 전략이 여러 줄이면 "근거 조합 1"처럼 따로 붙인다. 설명은 용지 머리에 있어 생략한다. */
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const evidenceId = useId();
@@ -175,12 +176,15 @@ function SlipLine({
       </span>
       <h2 className="flex min-w-0 flex-wrap items-baseline gap-x-2">
         <span className="text-sm font-semibold">
-          {STRATEGY_LABELS[line.strategy]}
-        </span>{" "}
-        {showDescription && (
-          <span className="text-xs text-muted">
-            {STRATEGY_DESCRIPTIONS[line.strategy]}
-          </span>
+          {title ?? STRATEGY_LABELS[line.strategy]}
+        </span>
+        {title === undefined && (
+          <>
+            {" "}
+            <span className="text-xs text-muted">
+              {STRATEGY_DESCRIPTIONS[line.strategy]}
+            </span>
+          </>
         )}
       </h2>
       <button
