@@ -106,7 +106,7 @@ vi deploy/.env
 | `DB_URL` | 비워 둔다 (`jdbc:mysql://mysql:3306/lottery`) |
 | `TOTP_SECRET` | 1-4에서 채운다. 지금은 비워 둔다 |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | 텔레그램 봇 값 |
-| `TELEGRAM_FAMILY_CHAT_ID` | 선택. 가족방 id. 비우면 가족방을 쓰지 않는다 |
+| `TELEGRAM_FAMILY_CHAT_ID` | 선택. 가족방 id. 비우면 가족방을 쓰지 않는다. 그룹 id는 음수라 `-`까지 넣는다. 가족방에서 명령을 보내면 api 로그의 `허용되지 않은 채팅의 메시지를 무시합니다: chat=…`에 id가 찍힌다. 그룹 설정(권한·느린 모드 등)을 바꾸면 슈퍼그룹으로 전환되며 id가 `-100…`으로 바뀌니, 봇이 갑자기 답하지 않으면 로그에서 새 id를 확인해 바꾸고 `up -d` 한다 |
 | `SCHEDULING_ENABLED` | 비워 둔다 (운영은 기본 `true`) |
 | `IMAGE_TAG` | 비워 둔다. 워크플로가 배포할 때마다 커밋 SHA를 써 넣는다 |
 
