@@ -219,6 +219,23 @@ describe("NumberStatistics", () => {
     expect(within(summary).getByText("8회")).toBeInTheDocument();
   });
 
+  it("marks evidence numbers only on the tab the evidence came from", async () => {
+    // given: 최근 빈도 근거로 연 화면
+    fetchMock.mockResolvedValue(respond(stats));
+    renderStats({ metric: "RECENT", highlight: [12] });
+    await screen.findByRole("region", { name: "추천 근거 번호" });
+
+    // when: 근거와 상관없는 지표로 바꾼다
+    await userEvent.click(screen.getByRole("tab", { name: "미출현 회차" }));
+
+    // then
+    expect(
+      screen.queryByRole("region", { name: "추천 근거 번호" }),
+    ).not.toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "번호 순위" });
+    expect(within(list).queryByText(/위$/)).not.toBeInTheDocument();
+  });
+
   it("writes cold values as rounds since last seen", async () => {
     // given
     fetchMock.mockResolvedValue(respond(stats));

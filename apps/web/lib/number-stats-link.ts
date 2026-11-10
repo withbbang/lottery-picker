@@ -51,18 +51,23 @@ export function evidenceStatsHref(
  * 주소 파라미터를 읽는다. 사람이 고친 주소도 화면이 깨지지 않게, 모르는 지표는 RECENT로,
  * 강조 번호는 1~45 정수만 남긴다. 번호 계산이 아니라 주소 검증이다.
  */
-export function parseNumberStatsParams(
-  params: URLSearchParams,
-): NumberStatsParams {
-  const date = params.get("date");
+export function parseNumberStatsParams(params: {
+  get(name: string): string | null;
+}): NumberStatsParams {
+  const raw = params.get("date");
+  const date = raw !== null && isCalendarDate(raw) ? raw : null;
   const metric = params.get("metric");
-  const highlight = (params.get("highlight") ?? "")
-    .split(",")
-    .filter((part) => /^\d+$/.test(part))
-    .map(Number)
-    .filter((n) => n >= 1 && n <= 45);
+  // 강조 번호는 그 날짜 추천의 근거다. 날짜를 못 쓰면 최근 추천을 보이므로 남의 번호가 되지 않게 버린다.
+  const highlight =
+    date === null
+      ? []
+      : (params.get("highlight") ?? "")
+          .split(",")
+          .filter((part) => /^\d+$/.test(part))
+          .map(Number)
+          .filter((n) => n >= 1 && n <= 45);
   return {
-    date: date !== null && isCalendarDate(date) ? date : null,
+    date,
     metric: NUMBER_METRICS.find((m) => m === metric) ?? "RECENT",
     highlight,
   };

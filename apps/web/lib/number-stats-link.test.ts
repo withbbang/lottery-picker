@@ -62,7 +62,9 @@ describe("parseNumberStatsParams", () => {
   });
 
   it("keeps only whole numbers between 1 and 45 in highlight", () => {
-    const params = new URLSearchParams("highlight=abc,99,7,0,12,3.5");
+    const params = new URLSearchParams(
+      "date=2026-11-10&highlight=abc,99,7,0,12,3.5",
+    );
 
     expect(parseNumberStatsParams(params).highlight).toEqual([7, 12]);
   });
@@ -77,6 +79,16 @@ describe("parseNumberStatsParams", () => {
     expect(
       parseNumberStatsParams(new URLSearchParams("date=2028-02-29")).date,
     ).toBe("2028-02-29");
+  });
+
+  it("drops highlighted numbers when the date is not usable", () => {
+    // 강조 번호는 그 날짜 추천의 근거다. 날짜를 버리고 최근 추천을 보이면 남의 번호가 된다.
+    const params = new URLSearchParams("date=2026-02-30&highlight=3,9");
+
+    expect(parseNumberStatsParams(params)).toMatchObject({
+      date: null,
+      highlight: [],
+    });
   });
 
   it("returns null date when date is missing or malformed", () => {

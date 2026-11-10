@@ -39,7 +39,9 @@ type Day = RecommendationHistoryResponse;
 type Line = Day["lines"][number];
 
 type Verdict =
-  { kind: "pending" } | { kind: "lost" } | { kind: "won"; best: PrizeRank };
+  | { kind: "pending" }
+  | { kind: "lost" }
+  | { kind: "won"; best: PrizeRank };
 
 /** 하루 용지의 결과. 추첨 전이든 추첨 뒤 채점 대기든 한 줄이라도 채점 전이면 채점 전으로 본다. */
 function dayVerdict(lines: Line[]): Verdict {
@@ -50,7 +52,9 @@ function dayVerdict(lines: Line[]): Verdict {
   const best = WINNING_RANKS.find((rank) =>
     winners.some((l) => l.prizeRank === rank),
   );
-  return best === undefined ? { kind: "lost" } : { kind: "won", best };
+  return best === undefined
+    ? { kind: "lost" }
+    : { kind: "won", best };
 }
 
 /** 근거 조합은 여러 줄이라 "근거 조합 1"처럼 순번을 붙인다. */
@@ -98,7 +102,11 @@ export function RecommendationHistory() {
       {data.items.map((day) => (
         <DaySlip key={day.date} day={day} />
       ))}
-      <Pagination page={page} totalPages={data.totalPages} onChange={setPage} />
+      <Pagination
+        page={page}
+        totalPages={data.totalPages}
+        onChange={setPage}
+      />
     </div>
   );
 }

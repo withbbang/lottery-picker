@@ -88,7 +88,9 @@ export function NumberStatistics({
   }
 
   const rows = data.metrics[metric];
-  const picked = highlight
+  // 강조 번호는 링크를 연 지표의 근거다. 다른 지표 탭에서 순위를 붙이면 근거처럼 읽혀 표시하지 않는다.
+  const marks = metric === initialMetric ? highlight : [];
+  const picked = marks
     .map((n) => rows.find((row) => row.number === n))
     .filter((row): row is RankedNumberResponse => row !== undefined);
   // 막대 길이의 기준. 서버 정렬 순서에 기대지 않고 가장 큰 값을 쓴다.
@@ -154,7 +156,7 @@ export function NumberStatistics({
           className="flex flex-col overflow-hidden rounded-lg border border-rule bg-surface"
         >
           {rows.map((row) => {
-            const marked = highlight.includes(row.number);
+            const marked = marks.includes(row.number);
             return (
               <li
                 key={row.number}
