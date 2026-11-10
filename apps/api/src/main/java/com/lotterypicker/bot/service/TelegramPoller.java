@@ -48,11 +48,6 @@ public class TelegramPoller implements SmartLifecycle {
 			log.info("텔레그램 설정이 없어 명령 폴링을 시작하지 않습니다.");
 			return;
 		}
-		try {
-			telegram.setMyCommands(BotCommand.menu());
-		} catch (TelegramException e) {
-			log.warn("텔레그램 명령 메뉴 등록 실패: {}", e.getMessage());
-		}
 		running = true;
 		thread = new Thread(this::loop, "telegram-poller");
 		thread.setDaemon(true);
@@ -73,6 +68,7 @@ public class TelegramPoller implements SmartLifecycle {
 	}
 
 	private void loop() {
+		registerMenu();
 		while (running && !Thread.currentThread().isInterrupted()) {
 			try {
 				pollOnce();
@@ -86,6 +82,15 @@ public class TelegramPoller implements SmartLifecycle {
 					Thread.currentThread().interrupt();
 				}
 			}
+		}
+	}
+
+	/** 메뉴 등록은 부가 기능이라 폴링 스레드에서 한다. 텔레그램이 느려도 앱 기동을 막지 않게. */
+	private void registerMenu() {
+		try {
+			telegram.setMyCommands(BotCommand.menu());
+		} catch (TelegramException e) {
+			log.warn("텔레그램 명령 메뉴 등록 실패: {}", e.getMessage());
 		}
 	}
 

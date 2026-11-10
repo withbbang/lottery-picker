@@ -5,7 +5,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +22,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -138,6 +142,25 @@ class TelegramPollerTest {
 		assertThat(poller.isRunning()).isFalse();
 		verify(telegram, never()).getUpdates(anyLong(), anyInt());
 		verify(telegram, never()).setMyCommands(any());
+	}
+
+	@Test
+	void 메뉴_등록이_느려도_앱_시작을_막지_않는다() {
+		// given: 텔레그램이 메뉴 등록 요청에 응답하지 않는다
+		CountDownLatch release = new CountDownLatch(1);
+		doAnswer(invocation -> {
+			release.await();
+			return null;
+		}).when(telegram).setMyCommands(any());
+
+		// when
+		assertTimeoutPreemptively(Duration.ofSeconds(2), poller::start);
+
+		// then: 메뉴 등록은 폴링 스레드에서 한다
+		verify(telegram, timeout(1000)).setMyCommands(any());
+		assertThat(poller.isRunning()).isTrue();
+		release.countDown();
+		poller.stop();
 	}
 
 }
