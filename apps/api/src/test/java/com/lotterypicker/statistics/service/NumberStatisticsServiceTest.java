@@ -88,8 +88,8 @@ class NumberStatisticsServiceTest {
 	@Test
 	void 추천에_저장된_회차_범위만으로_계산한다() {
 		// given: 추천은 1~2회로 만들었고, 3회는 나중에 수집됐다
-		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9))
-			.willReturn(List.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
+		given(recommendations.findFirstByDateAndControlFalseOrderByLineIndexAsc(NOV_9))
+			.willReturn(Optional.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
 		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(2), any()))
 			.willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6), round(2, 1, 7, 8, 9, 10, 11)));
 
@@ -107,8 +107,8 @@ class NumberStatisticsServiceTest {
 	@Test
 	void 추천을_만든_뒤_수집된_회차는_빼고_계산한다() {
 		// given: 추천은 11월 9일 17시에 만들었다. 범위 안의 빠진 회차가 그 뒤에 채워질 수 있다
-		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9))
-			.willReturn(List.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
+		given(recommendations.findFirstByDateAndControlFalseOrderByLineIndexAsc(NOV_9))
+			.willReturn(Optional.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
 		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(1, 2, NOV_9.atTime(17, 0)))
 			.willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6)));
 
@@ -124,8 +124,8 @@ class NumberStatisticsServiceTest {
 	@Test
 	void 같은_추천의_통계는_한_번만_계산한다() {
 		// given: 같은 날짜를 두 번 본다
-		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9))
-			.willReturn(List.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
+		given(recommendations.findFirstByDateAndControlFalseOrderByLineIndexAsc(NOV_9))
+			.willReturn(Optional.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
 		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(2), any()))
 			.willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6), round(2, 1, 7, 8, 9, 10, 11)));
 
@@ -139,25 +139,10 @@ class NumberStatisticsServiceTest {
 	}
 
 	@Test
-	void 대조군_줄은_기준으로_쓰지_않는다() {
-		// given: 정렬상 대조군이 먼저 와도 추천 줄의 범위를 쓴다
-		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9)).willReturn(
-				List.of(line(NOV_9, StrategyType.CONTROL, 5, 9), line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
-		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(2), any()))
-			.willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6), round(2, 1, 7, 8, 9, 10, 11)));
-
-		// when
-		NumberStatisticsResponse response = service.find(NOV_9).orElseThrow();
-
-		// then
-		assertThat(response.historyToRound()).isEqualTo(2);
-	}
-
-	@Test
 	void 세_지표_모두_45개씩_준다() {
 		// given
-		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9))
-			.willReturn(List.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 1)));
+		given(recommendations.findFirstByDateAndControlFalseOrderByLineIndexAsc(NOV_9))
+			.willReturn(Optional.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 1)));
 		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(1), any())).willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6)));
 
 		// when
@@ -174,8 +159,8 @@ class NumberStatisticsServiceTest {
 	void 날짜가_없으면_가장_최근_추천_기준이다() {
 		// given
 		DailyRecommendation latest = line(NOV_10, StrategyType.RECENT_HOT, 1, 1);
-		given(recommendations.findFirstByDateLessThanEqualOrderByDateDesc(NOV_10)).willReturn(Optional.of(latest));
-		given(recommendations.findByDateOrderByLineIndexAsc(NOV_10)).willReturn(List.of(latest));
+		given(recommendations.findFirstByDateLessThanEqualAndControlFalseOrderByDateDescLineIndexAsc(NOV_10))
+			.willReturn(Optional.of(latest));
 		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(1), any())).willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6)));
 
 		// when
@@ -188,7 +173,8 @@ class NumberStatisticsServiceTest {
 	@Test
 	void 추천이_하나도_없으면_빈_값이다() {
 		// given
-		given(recommendations.findFirstByDateLessThanEqualOrderByDateDesc(NOV_10)).willReturn(Optional.empty());
+		given(recommendations.findFirstByDateLessThanEqualAndControlFalseOrderByDateDescLineIndexAsc(NOV_10))
+			.willReturn(Optional.empty());
 
 		// when / then
 		assertThat(service.find(null)).isEmpty();
@@ -197,7 +183,7 @@ class NumberStatisticsServiceTest {
 	@Test
 	void 지정한_날짜에_추천이_없으면_COMMON_NOT_FOUND다() {
 		// given
-		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9)).willReturn(List.of());
+		given(recommendations.findFirstByDateAndControlFalseOrderByLineIndexAsc(NOV_9)).willReturn(Optional.empty());
 
 		// when / then
 		assertThatThrownBy(() -> service.find(NOV_9)).isInstanceOf(BusinessException.class)

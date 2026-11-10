@@ -22,6 +22,12 @@ public interface DailyRecommendationRepository extends Repository<DailyRecommend
 	/** {@code date} 이전(포함) 중 가장 최근 추천의 줄 하나. 그 날짜를 알아내는 데만 쓴다. */
 	Optional<DailyRecommendation> findFirstByDateLessThanEqualOrderByDateDesc(LocalDate date);
 
+	/** 그날 추천 줄(대조군 제외) 중 첫 줄. 번호 통계의 기준 회차 범위를 읽는 데 쓴다. */
+	Optional<DailyRecommendation> findFirstByDateAndControlFalseOrderByLineIndexAsc(LocalDate date);
+
+	/** {@code date} 이전(포함) 가장 최근 추천의 첫 줄(대조군 제외). */
+	Optional<DailyRecommendation> findFirstByDateLessThanEqualAndControlFalseOrderByDateDescLineIndexAsc(LocalDate date);
+
 	/** 성적표 집계에서 채점된 줄의 추천을 한 번에 가져온다. */
 	List<DailyRecommendation> findAllById(Iterable<Long> ids);
 

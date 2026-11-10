@@ -58,17 +58,14 @@ public class NumberStatisticsService {
 	 * @throws BusinessException 지정한 날짜에 추천이 없으면 {@link ErrorCode#COMMON_NOT_FOUND}
 	 */
 	public Optional<NumberStatisticsResponse> find(@Nullable LocalDate date) {
+		// 기준은 그날 추천 줄 하나다. 대조군은 화면에 없는 줄이라 기준으로 쓰지 않는다.
 		if (date == null) {
-			return recommendations.findFirstByDateLessThanEqualOrderByDateDesc(LocalDate.now(clock))
-				.flatMap(latest -> basis(latest.getDate()))
+			return recommendations
+				.findFirstByDateLessThanEqualAndControlFalseOrderByDateDescLineIndexAsc(LocalDate.now(clock))
 				.map(this::compute);
 		}
-		return Optional.of(compute(basis(date).orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND))));
-	}
-
-	/** 그날 추천 줄 하나. 대조군은 화면에 없는 줄이라 기준으로 쓰지 않는다. */
-	private Optional<DailyRecommendation> basis(LocalDate date) {
-		return recommendations.findByDateOrderByLineIndexAsc(date).stream().filter(line -> !line.isControl()).findFirst();
+		return Optional.of(compute(recommendations.findFirstByDateAndControlFalseOrderByLineIndexAsc(date)
+			.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND))));
 	}
 
 	private NumberStatisticsResponse compute(DailyRecommendation recommendation) {

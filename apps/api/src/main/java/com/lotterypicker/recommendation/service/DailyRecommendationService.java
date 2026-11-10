@@ -75,6 +75,8 @@ public class DailyRecommendationService {
 		if (repository.existsByDate(date)) {
 			return Optional.empty();
 		}
+		// 생성 시각은 회차를 읽기 전에 찍는다. 번호 통계는 이 시각까지 수집된 회차로 엔진이 본 회차를 다시 고른다.
+		LocalDateTime createdAt = LocalDateTime.now(clock);
 		List<LottoRound> stored = rounds.findAllByOrderByRoundNoAsc();
 		if (stored.isEmpty()) {
 			throw new BusinessException(ErrorCode.RECOMMENDATION_NO_HISTORY);
@@ -86,7 +88,7 @@ public class DailyRecommendationService {
 		GeneratedSet generated = engine.generate(toHistory(stored), constraint, random);
 
 		List<DailyRecommendation> rows = toRows(generated, date, round, constraint, stored.get(0).getRoundNo(),
-				latest.getRoundNo());
+				latest.getRoundNo(), createdAt);
 		try {
 			transactions.executeWithoutResult(status -> repository.saveAll(rows));
 		} catch (DataIntegrityViolationException | PessimisticLockingFailureException e) {
@@ -162,7 +164,7 @@ public class DailyRecommendationService {
 	}
 
 	private List<DailyRecommendation> toRows(GeneratedSet generated, LocalDate date, int round,
-			RecommendationConstraint constraint, int historyFrom, int historyTo) {
+			RecommendationConstraint constraint, int historyFrom, int historyTo, LocalDateTime createdAt) {
 		DailyRecommendation.DailyRecommendationBuilder base = DailyRecommendation.builder()
 			.date(date)
 			.roundNo(round)
@@ -170,7 +172,7 @@ public class DailyRecommendationService {
 			.excludedSnapshot(snapshot(constraint.excluded()))
 			.historyFromRound(historyFrom)
 			.historyToRound(historyTo)
-			.createdAt(LocalDateTime.now(clock));
+			.createdAt(createdAt);
 
 		List<DailyRecommendation> rows = new ArrayList<>();
 		List<GeneratedLine> lines = generated.lines();

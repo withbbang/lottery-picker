@@ -125,6 +125,54 @@ class DailyRecommendationServiceTest {
 		}).toList();
 	}
 
+	/** 회차를 읽는 동안 시간이 흐르는 시계. */
+	private static final class TickingClock extends Clock {
+
+		private Instant now;
+
+		TickingClock(Instant start) {
+			this.now = start;
+		}
+
+		void advance(java.time.Duration duration) {
+			now = now.plus(duration);
+		}
+
+		@Override
+		public ZoneId getZone() {
+			return SEOUL;
+		}
+
+		@Override
+		public Clock withZone(ZoneId zone) {
+			return this;
+		}
+
+		@Override
+		public Instant instant() {
+			return now;
+		}
+
+	}
+
+	@Test
+	void 생성_시각은_회차를_읽기_전_시각이다() {
+		// given: 회차를 읽고 엔진을 돌리는 사이 1분이 흐른다. 그 사이 수집된 회차는 엔진이 보지 못했다
+		TickingClock clock = new TickingClock(Instant.parse("2026-11-06T08:00:00Z"));
+		List<LottoRound> stored = storedRounds(LATEST_ROUND, LATEST_DRAW, ROUNDS);
+		when(rounds.findAllByOrderByRoundNoAsc()).thenAnswer(inv -> {
+			clock.advance(java.time.Duration.ofMinutes(1));
+			return stored;
+		});
+
+		// when
+		serviceAt(clock).generateIfAbsent(DATE);
+
+		// then: 통계는 이 시각까지 수집된 회차만 다시 읽는다
+		assertThat(db).isNotEmpty()
+			.allSatisfy(line -> assertThat(line.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 11, 6, 17, 0)));
+	}
+
 	@Test
 	void 추천과_대조군_10줄을_저장한다() {
 		// when

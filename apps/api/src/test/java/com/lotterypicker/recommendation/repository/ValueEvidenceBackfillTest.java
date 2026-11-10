@@ -49,13 +49,17 @@ class ValueEvidenceBackfillTest {
 	}
 
 	private void line(long id, String strategy, String evidence) {
+		line(id, strategy, evidence, "");
+	}
+
+	private void line(long id, String strategy, String evidence, String fixed) {
 		jdbc.update("""
 				INSERT INTO daily_recommendation (id, rec_date, round_no, strategy, line_index, n1, n2, n3, n4, n5, n6,
 				  evidence, relaxation, fixed_snapshot, excluded_snapshot, history_from_round, history_to_round,
 				  is_control, created_at)
-				VALUES (?, DATE '2026-11-06', 5, ?, ?, 1, 2, 7, 12, 30, 41, ?, 'NONE', '', '', 1, 4, FALSE,
+				VALUES (?, DATE '2026-11-06', 5, ?, ?, 1, 2, 7, 12, 30, 41, ?, 'NONE', ?, '', 1, 4, FALSE,
 				  TIMESTAMP '2026-11-06 17:00:00')
-				""", id, strategy, (int) id, evidence);
+				""", id, strategy, (int) id, evidence, fixed);
 	}
 
 	private String evidenceNumbersOf(long id) {
@@ -72,15 +76,51 @@ class ValueEvidenceBackfillTest {
 	}
 
 	@Test
-	void 전체_출현_값이_같은_번호를_근거_순서대로_채운다() throws Exception {
+	void 전체_출현_값마다_맞는_번호를_근거_순서대로_채운다() throws Exception {
 		// given
-		line(1, "ALL_TIME", "[\"전체 3회 중 3번 출현\",\"전체 3회 중 1번 출현\"]");
+		line(1, "ALL_TIME", "[\"전체 3회 중 3번 출현\",\"전체 3회 중 2번 출현\"]");
 
 		// when
 		runBackfill();
 
-		// then: 3번 출현은 1, 1번 출현은 7·12. 추천 뒤 수집된 4회는 세지 않는다
-		assertThat(evidenceNumbersOf(1)).isEqualTo("1,7,12");
+		// then: 3번 출현은 1, 2번 출현은 2. 추천 뒤 수집된 4회는 세지 않는다
+		assertThat(evidenceNumbersOf(1)).isEqualTo("1,2");
+	}
+
+	@Test
+	void 고정_번호는_근거_번호에_넣지_않는다() throws Exception {
+		// given: 옛 엔진은 고정 번호의 근거를 쓰지 않았다
+		line(8, "LONG_COLD", "[\"3회째 미출현\"]", "30");
+
+		// when
+		runBackfill();
+
+		// then
+		assertThat(evidenceNumbersOf(8)).isEqualTo("41");
+	}
+
+	@Test
+	void 어느_번호였는지_특정할_수_없으면_비워_둔다() throws Exception {
+		// given: 문구가 둘이면 값마다 번호 하나였는데, 1번 출현은 7과 12 둘이다
+		line(9, "ALL_TIME", "[\"전체 3회 중 3번 출현\",\"전체 3회 중 1번 출현\"]");
+
+		// when
+		runBackfill();
+
+		// then
+		assertThat(evidenceNumbersOf(9)).isEmpty();
+	}
+
+	@Test
+	void 문구의_전체_회차_수가_다시_센_회차_수와_다르면_비워_둔다() throws Exception {
+		// given: 엔진은 4회를 봤다는데 추천 시각까지 수집된 회차는 3회다
+		line(10, "ALL_TIME", "[\"전체 4회 중 3번 출현\"]");
+
+		// when
+		runBackfill();
+
+		// then
+		assertThat(evidenceNumbersOf(10)).isEmpty();
 	}
 
 	@Test

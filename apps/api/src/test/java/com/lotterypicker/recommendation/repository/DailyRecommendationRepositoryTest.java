@@ -103,6 +103,41 @@ class DailyRecommendationRepositoryTest {
 	}
 
 	@Test
+	void 그날_대조군을_뺀_첫_줄을_찾는다() {
+		// given
+		repository.saveAll(List.of(line(DATE, StrategyType.CONTROL, 0, List.of()),
+				line(DATE, StrategyType.BALANCED, 1, List.of()), line(DATE, StrategyType.PAIR, 0, List.of())));
+		entityManager.flush();
+		entityManager.clear();
+
+		// when
+		var found = repository.findFirstByDateAndControlFalseOrderByLineIndexAsc(DATE);
+
+		// then
+		assertThat(found).hasValueSatisfying(line -> assertThat(line.getStrategy()).isEqualTo(StrategyType.PAIR));
+	}
+
+	@Test
+	void 가장_최근_추천의_대조군을_뺀_첫_줄을_찾는다() {
+		// given: 11/7은 기준일 뒤, 11/5가 가장 최근이다
+		repository.saveAll(List.of(line(LocalDate.of(2026, 11, 4), StrategyType.PAIR, 0, List.of()),
+				line(LocalDate.of(2026, 11, 5), StrategyType.CONTROL, 0, List.of()),
+				line(LocalDate.of(2026, 11, 5), StrategyType.BALANCED, 1, List.of()),
+				line(LocalDate.of(2026, 11, 7), StrategyType.PAIR, 0, List.of())));
+		entityManager.flush();
+		entityManager.clear();
+
+		// when
+		var found = repository.findFirstByDateLessThanEqualAndControlFalseOrderByDateDescLineIndexAsc(DATE);
+
+		// then
+		assertThat(found).hasValueSatisfying(line -> {
+			assertThat(line.getDate()).isEqualTo(LocalDate.of(2026, 11, 5));
+			assertThat(line.getStrategy()).isEqualTo(StrategyType.BALANCED);
+		});
+	}
+
+	@Test
 	void 추천_날짜를_최근순으로_중복없이_나눠_센다() {
 		// given: 11/4 대조군만, 11/5 두 줄, 11/6·11/7 한 줄씩
 		repository.saveAll(List.of(line(LocalDate.of(2026, 11, 4), StrategyType.CONTROL, 0, List.of()),
@@ -214,7 +249,8 @@ class DailyRecommendationRepositoryTest {
 		// then
 		assertThat(names).containsExactlyInAnyOrder("saveAll", "existsByDate", "findByDateOrderByLineIndexAsc",
 				"findByRoundNoOrderByDateAscLineIndexAsc", "findAllById", "findFirstByDateLessThanEqualOrderByDateDesc", "findRecommendationDates",
-				"findByDateInAndControlFalseOrderByDateDescLineIndexAsc");
+				"findByDateInAndControlFalseOrderByDateDescLineIndexAsc", "findFirstByDateAndControlFalseOrderByLineIndexAsc",
+				"findFirstByDateLessThanEqualAndControlFalseOrderByDateDescLineIndexAsc");
 	}
 
 }
