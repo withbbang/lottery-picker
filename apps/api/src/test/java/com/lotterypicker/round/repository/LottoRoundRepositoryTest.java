@@ -37,6 +37,22 @@ class LottoRoundRepositoryTest {
 	}
 
 	@Test
+	void 회차_범위를_양끝_포함_오름차순으로_읽는다() {
+		// given
+		repository.save(round(1249, LocalDate.of(2026, 11, 7)));
+		repository.save(round(1246, LocalDate.of(2026, 10, 17)));
+		repository.save(round(1248, LocalDate.of(2026, 10, 31)));
+		repository.save(round(1247, LocalDate.of(2026, 10, 24)));
+		repository.flush();
+
+		// when
+		var ranged = repository.findByRoundNoBetweenOrderByRoundNoAsc(1247, 1248);
+
+		// then
+		assertThat(ranged).extracting(LottoRound::getRoundNo).containsExactly(1247, 1248);
+	}
+
+	@Test
 	void 최신_회차를_찾는다() {
 		// given
 		repository.save(round(1247, LocalDate.of(2026, 10, 24)));

@@ -12,6 +12,9 @@ public interface LottoRoundRepository extends JpaRepository<LottoRound, Integer>
 
 	List<LottoRound> findAllByOrderByRoundNoAsc();
 
+	/** 양끝 포함. 지난 추천의 통계를 그 추천이 쓴 회차 범위로 다시 계산할 때 쓴다. */
+	List<LottoRound> findByRoundNoBetweenOrderByRoundNoAsc(int from, int to);
+
 	@Query("select r.roundNo from LottoRound r")
 	List<Integer> findAllRoundNos();
 
