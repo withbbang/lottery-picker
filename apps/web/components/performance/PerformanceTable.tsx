@@ -62,7 +62,7 @@ export function PerformanceTable() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted">
-        지금까지 추천한 줄을 실제 추첨 결과로 채점한 누적 성적입니다. 어떤
+        지금까지 추천한 줄을 실제 추첨 결과와 맞춰 본 누적 성적입니다. 어떤
         번호를 고르든 한 줄이 5등 이상일 확률은 {theory}라서, 이보다 꾸준히
         높아야 의미가 있습니다.
       </p>

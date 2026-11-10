@@ -164,7 +164,7 @@ describe("RoundDetail", () => {
 
     // then
     expect(
-      await screen.findByRole("heading", { name: "추천 채점" }),
+      await screen.findByRole("heading", { name: "추천 결과" }),
     ).toBeInTheDocument();
     expect(
       await screen.findByText("이 회차에는 추천한 번호가 없습니다."),

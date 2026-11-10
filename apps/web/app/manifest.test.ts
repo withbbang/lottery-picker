@@ -10,7 +10,7 @@ describe("manifest", () => {
     // then
     expect(m.display).toBe("standalone");
     expect(m.start_url).toBe("/");
-    expect(m.name).toBe("로또 번호 추첨");
+    expect(m.name).toBe("로또 추첨");
     expect(m.short_name).toBe("로또 추첨");
   });
 

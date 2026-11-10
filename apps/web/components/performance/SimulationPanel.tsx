@@ -100,7 +100,7 @@ export function SimulationPanel() {
             ? []
             : [
                 [
-                  "채점한 줄 수",
+                  "추첨한 줄 수",
                   `전략마다 ${sharedLines.toLocaleString("ko-KR")}줄`,
                 ] as [string, string],
               ]),

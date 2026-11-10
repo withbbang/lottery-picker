@@ -41,17 +41,17 @@ export function RoundResults({ round }: { round: number }) {
   });
 
   if (isPending) {
-    return <p className="text-muted">채점 결과를 불러오는 중…</p>;
+    return <p className="text-muted">추첨 결과를 불러오는 중…</p>;
   }
   if (isError) {
     return (
       <p role="alert" className="text-danger">
-        채점 결과를 불러오지 못했습니다.
+        추첨 결과를 불러오지 못했습니다.
       </p>
     );
   }
   if (data.pending) {
-    return <p className="text-muted">아직 채점 전입니다.</p>;
+    return <p className="text-muted">아직 추첨 전입니다.</p>;
   }
   if (data.lines.length === 0) {
     return <p className="text-muted">이 회차에는 추천한 번호가 없습니다.</p>;

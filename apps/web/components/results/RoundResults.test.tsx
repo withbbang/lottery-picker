@@ -144,7 +144,7 @@ describe("RoundResults", () => {
 
     // then
     expect(
-      await screen.findByText("아직 채점 전입니다."),
+      await screen.findByText("아직 추첨 전입니다."),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("이 회차에는 추천한 번호가 없습니다."),

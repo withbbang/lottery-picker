@@ -21,7 +21,7 @@ const plex = IBM_Plex_Sans_KR({
 export const metadata: Metadata = {
   title: "로또 번호 추첨",
   description:
-    "역대 당첨번호 통계로 매일 추천 번호 5줄을 만들고, 추첨 뒤 채점합니다.",
+    "역대 당첨번호 통계로 매일 추천 번호 5줄을 만들고, 추첨 결과와 맞춰 봅니다.",
   appleWebApp: {
     capable: true,
     title: "로또 추첨",

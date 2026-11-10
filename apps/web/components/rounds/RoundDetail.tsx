@@ -57,7 +57,7 @@ export function RoundDetail({ round }: { round: number }) {
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">추천 채점</h2>
+        <h2 className="text-lg font-semibold">추천 결과</h2>
         <RoundResults round={data.round} />
       </section>
 

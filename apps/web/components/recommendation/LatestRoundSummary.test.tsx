@@ -71,7 +71,7 @@ describe("LatestRoundSummary", () => {
     );
   });
 
-  it("shows the scored results inline when 채점 결과 보기 is clicked", async () => {
+  it("shows the scored results inline when 추첨 결과 보기 is clicked", async () => {
     // given
     fetchMock.mockImplementation(async (url: string) =>
       url.endsWith("/results")
@@ -99,14 +99,14 @@ describe("LatestRoundSummary", () => {
           ]),
     );
     renderSummary();
-    const toggle = await screen.findByRole("button", { name: /채점 결과 보기/ });
+    const toggle = await screen.findByRole("button", { name: /추첨 결과 보기/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     // when
     await userEvent.click(toggle);
 
     // then
-    expect(await screen.findByText("아직 채점 전입니다.")).toBeVisible();
+    expect(await screen.findByText("아직 추첨 전입니다.")).toBeVisible();
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/rounds/1248/results", undefined);
   });
 

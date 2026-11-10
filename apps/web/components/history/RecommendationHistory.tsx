@@ -153,7 +153,7 @@ function VerdictMark({ verdict }: { verdict: Verdict }) {
   }
   return (
     <span className="shrink-0 text-sm text-muted">
-      {verdict.kind === "pending" ? "채점 전" : "낙첨"}
+      {verdict.kind === "pending" ? "추첨 전" : "낙첨"}
     </span>
   );
 }

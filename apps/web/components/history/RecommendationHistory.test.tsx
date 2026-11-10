@@ -117,7 +117,7 @@ describe("RecommendationHistory", () => {
     expect(
       within(days[0]).getByRole("link", { name: "1250회" }),
     ).toHaveAttribute("href", "/rounds/1250");
-    expect(within(days[0]).getByText("채점 전")).toBeInTheDocument();
+    expect(within(days[0]).getByText("추첨 전")).toBeInTheDocument();
     expect(within(days[1]).getByText("4등 당첨")).toBeInTheDocument();
     expect(within(days[1]).getByText("4개 일치")).toBeInTheDocument();
     expect(within(days[1]).getByText("4등")).toBeInTheDocument();

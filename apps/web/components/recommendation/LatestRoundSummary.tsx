@@ -57,7 +57,7 @@ export function LatestRoundSummary() {
         onClick={() => setOpen((value) => !value)}
         className="flex w-full items-center justify-between border-t border-rule px-4 py-2.5 text-sm font-medium text-slip hover:bg-paper"
       >
-        채점 결과 보기
+        추첨 결과 보기
         <span
           aria-hidden="true"
           className={`transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
