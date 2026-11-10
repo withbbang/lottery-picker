@@ -1,6 +1,7 @@
 package com.lotterypicker.result.repository;
 
 import com.lotterypicker.result.entity.RecommendationResult;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
@@ -11,6 +12,9 @@ public interface RecommendationResultRepository extends Repository<Recommendatio
 	List<RecommendationResult> saveAll(Iterable<RecommendationResult> results);
 
 	List<RecommendationResult> findByRoundNo(int roundNo);
+
+	/** 지난 추천 목록에 붙일 채점 결과. 채점 전인 줄은 결과가 없다. */
+	List<RecommendationResult> findByRecommendationIdIn(Collection<Long> recommendationIds);
 
 	/** 성적표 집계용. 채점된 줄 전체. */
 	List<RecommendationResult> findAll();

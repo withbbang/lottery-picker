@@ -2,6 +2,7 @@ package com.lotterypicker.recommendation.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.lotterypicker.lotto.LottoNumbers;
 import com.lotterypicker.recommendation.engine.Relaxation;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -101,6 +103,46 @@ class DailyRecommendationRepositoryTest {
 	}
 
 	@Test
+	void 추천_날짜를_최근순으로_중복없이_나눠_센다() {
+		// given: 11/4 대조군만, 11/5 두 줄, 11/6·11/7 한 줄씩
+		repository.saveAll(List.of(line(LocalDate.of(2026, 11, 4), StrategyType.CONTROL, 0, List.of()),
+				line(LocalDate.of(2026, 11, 5), StrategyType.PAIR, 0, List.of()),
+				line(LocalDate.of(2026, 11, 5), StrategyType.BALANCED, 1, List.of()),
+				line(LocalDate.of(2026, 11, 6), StrategyType.PAIR, 0, List.of()),
+				line(LocalDate.of(2026, 11, 7), StrategyType.PAIR, 0, List.of())));
+		entityManager.flush();
+		entityManager.clear();
+
+		// when
+		var page = repository.findRecommendationDates(PageRequest.of(0, 2));
+
+		// then
+		assertThat(page.getContent()).containsExactly(LocalDate.of(2026, 11, 7), LocalDate.of(2026, 11, 6));
+		assertThat(page.getTotalElements()).isEqualTo(3);
+	}
+
+	@Test
+	void 여러_날짜의_추천_줄을_대조군_빼고_날짜_최근순_줄_순서로_읽는다() {
+		// given
+		LocalDate older = LocalDate.of(2026, 11, 5);
+		repository.saveAll(List.of(line(older, StrategyType.BALANCED, 1, List.of()),
+				line(older, StrategyType.PAIR, 0, List.of()), line(DATE, StrategyType.PAIR, 0, List.of()),
+				line(DATE, StrategyType.CONTROL, 0, List.of()),
+				line(LocalDate.of(2026, 11, 7), StrategyType.PAIR, 0, List.of())));
+		entityManager.flush();
+		entityManager.clear();
+
+		// when
+		var lines = repository.findByDateInAndControlFalseOrderByDateDescLineIndexAsc(List.of(older, DATE));
+
+		// then
+		assertThat(lines).extracting(DailyRecommendation::getDate, DailyRecommendation::getStrategy)
+			.containsExactly(tuple(DATE, StrategyType.PAIR),
+					tuple(older, StrategyType.PAIR),
+					tuple(older, StrategyType.BALANCED));
+	}
+
+	@Test
 	void 긴_근거도_저장한다() {
 		// given: TEXT 컬럼이라 VARCHAR(255)보다 길어도 들어간다
 		List<String> evidence = List.of("가".repeat(2_000));
@@ -171,7 +213,8 @@ class DailyRecommendationRepositoryTest {
 
 		// then
 		assertThat(names).containsExactlyInAnyOrder("saveAll", "existsByDate", "findByDateOrderByLineIndexAsc",
-				"findByRoundNoOrderByDateAscLineIndexAsc", "findAllById", "findFirstByDateLessThanEqualOrderByDateDesc");
+				"findByRoundNoOrderByDateAscLineIndexAsc", "findAllById", "findFirstByDateLessThanEqualOrderByDateDesc", "findRecommendationDates",
+				"findByDateInAndControlFalseOrderByDateDescLineIndexAsc");
 	}
 
 }
