@@ -257,6 +257,26 @@ export function StoreStatistics({ params }: { params: StoreStatsParams }) {
       );
     }
 
+    // 전국이면 시·도 순위, 시·도면 그 안 시·군·구 순위. 온라인은 시·군·구가 없어 순위를 두지 않는다.
+    const areas =
+      region === null
+        ? {
+            title: "시·도별 당첨",
+            label: "시·도 순위",
+            items: data.regions,
+            hrefOf: (name: string) =>
+              storeStatsHref({ rank, region: name, district: null }),
+          }
+        : data.districts !== null && data.districts.length > 0
+          ? {
+              title: `${region} 시·군·구별 당첨`,
+              label: `${region} 시·군·구 순위`,
+              items: data.districts,
+              hrefOf: (name: string) =>
+                storeStatsHref({ rank, region, district: name }),
+            }
+          : null;
+
     return (
       <>
         <div className="flex flex-col gap-1">
@@ -272,34 +292,17 @@ export function StoreStatistics({ params }: { params: StoreStatsParams }) {
           <StoreMap pins={data.pins} />
         )}
 
-        <section className="flex flex-col gap-2">
-          <h2 className="font-semibold">
-            {region === null ? "시·도별 당첨" : `${region} 시·군·구별 당첨`}
-          </h2>
-          {region === null ? (
+        {areas !== null && (
+          <section className="flex flex-col gap-2">
+            <h2 className="font-semibold">{areas.title}</h2>
             <AreaRanking
-              label="시·도 순위"
-              areas={data.regions}
-              hrefOf={(name) =>
-                storeStatsHref({ rank, region: name, district: null })
-              }
-              current={null}
-            />
-          ) : data.districts !== null && data.districts.length > 0 ? (
-            <AreaRanking
-              label={`${region} 시·군·구 순위`}
-              areas={data.districts}
-              hrefOf={(name) =>
-                storeStatsHref({ rank, region, district: name })
-              }
+              label={areas.label}
+              areas={areas.items}
+              hrefOf={areas.hrefOf}
               current={district}
             />
-          ) : (
-            <p className="text-sm text-muted">
-              온라인 판매는 시·군·구 구분이 없습니다.
-            </p>
-          )}
-        </section>
+          </section>
+        )}
 
         <section className="flex flex-col gap-2">
           <h2 className="font-semibold">두 번 이상 당첨된 판매점</h2>
