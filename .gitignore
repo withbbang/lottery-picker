@@ -33,3 +33,6 @@ Thumbs.db
 
 # Playwright MCP 실행 로그·스냅샷
 /.playwright-mcp/
+
+# 브레인스토밍 시안·SDD 작업 폴더
+.superpowers/
