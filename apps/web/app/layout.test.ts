@@ -16,6 +16,14 @@ describe("layout metadata", () => {
     ]);
   });
 
+  it("uses the short app name as the tab title", async () => {
+    // when
+    const { metadata } = await import("@/app/layout");
+
+    // then
+    expect(metadata.title).toBe("로또 추첨");
+  });
+
   it("lets iOS open the app full screen with a short title", async () => {
     // when
     const { metadata } = await import("@/app/layout");
