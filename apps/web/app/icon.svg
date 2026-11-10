@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3B3F9A"/>
+      <stop offset="1" stop-color="#23255F"/>
+    </linearGradient>
+    <linearGradient id="crumb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFF3D6"/>
+      <stop offset="1" stop-color="#F8DFAE"/>
+    </linearGradient>
+    <radialGradient id="ballY" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#FFE06B"/>
+      <stop offset="1" stop-color="#F2A900"/>
+    </radialGradient>
+    <radialGradient id="ballR" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#FF8A7A"/>
+      <stop offset="1" stop-color="#E03A3A"/>
+    </radialGradient>
+    <radialGradient id="ballB" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#7CCBFF"/>
+      <stop offset="1" stop-color="#1E7FD6"/>
+    </radialGradient>
+  </defs>
+
+  <!-- sparkles -->
+  <g fill="#F2A900">
+    <path d="M122 96 l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5z"/>
+    <path d="M392 96 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4z"/>
+    <path d="M118 236 l4 9 9 4 -9 4 -4 9 -4 -9 -9 -4 9 -4z"/>
+  </g>
+
+  <!-- bread + balls, scaled to leave room for the wordmark -->
+  <g transform="translate(103 14) scale(0.6)">
+    <!-- bread slice -->
+    <path d="M152 400 Q138 400 138 386 L138 236
+             C102 224 90 186 108 156
+             C128 118 186 104 248 104
+             C310 104 368 118 388 156
+             C406 186 394 224 358 236
+             L358 386 Q358 400 344 400 Z"
+          fill="url(#crumb)" stroke="#C47A2C" stroke-width="22" stroke-linejoin="round"/>
+
+    <!-- crumb dots -->
+    <g fill="#EBCB8E">
+      <circle cx="176" cy="176" r="6"/>
+      <circle cx="322" cy="168" r="5"/>
+      <circle cx="250" cy="150" r="5"/>
+      <circle cx="170" cy="350" r="5"/>
+    </g>
+
+    <!-- face -->
+    <circle cx="204" cy="262" r="12" fill="#3A2A1C"/>
+    <circle cx="284" cy="262" r="12" fill="#3A2A1C"/>
+    <circle cx="208" cy="258" r="4" fill="#FFFFFF"/>
+    <circle cx="288" cy="258" r="4" fill="#FFFFFF"/>
+    <path d="M226 288 Q244 308 262 288" fill="none" stroke="#3A2A1C" stroke-width="9" stroke-linecap="round"/>
+    <ellipse cx="178" cy="292" rx="15" ry="9" fill="#FFB3A1" opacity="0.8"/>
+    <ellipse cx="310" cy="292" rx="15" ry="9" fill="#FFB3A1" opacity="0.8"/>
+
+    <!-- lottery balls -->
+    <g font-family="Arial, Helvetica, sans-serif" font-weight="bold" text-anchor="middle">
+      <circle cx="398" cy="270" r="36" fill="url(#ballR)" stroke="#23255F" stroke-width="6"/>
+      <circle cx="398" cy="270" r="20" fill="#FFFFFF"/>
+      <text x="398" y="280" font-size="28" fill="#23255F">3</text>
+
+      <circle cx="282" cy="414" r="38" fill="url(#ballB)" stroke="#23255F" stroke-width="6"/>
+      <circle cx="282" cy="414" r="21" fill="#FFFFFF"/>
+      <text x="282" y="424" font-size="28" fill="#23255F">21</text>
+
+      <circle cx="362" cy="362" r="58" fill="url(#ballY)" stroke="#23255F" stroke-width="6"/>
+      <circle cx="362" cy="362" r="33" fill="#FFFFFF"/>
+      <text x="362" y="379" font-size="48" fill="#23255F">7</text>
+      <ellipse cx="338" cy="328" rx="14" ry="8" fill="#FFFFFF" opacity="0.6" transform="rotate(-35 338 328)"/>
+    </g>
+  </g>
+
+  <!-- wordmark: drawn as shapes, so no font is needed -->
+  <g fill="none" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="#23255F">
+      <path d="M115 322 V390 H141"/>
+      <path d="M235 322 H269 M252 322 V390"/>
+      <path d="M295 322 H329 M312 322 V390"/>
+    </g>
+    <g stroke="#23255F">
+      <ellipse cx="188" cy="356" rx="21" ry="34"/>
+      <ellipse cx="376" cy="356" rx="21" ry="34"/>
+    </g>
+  </g>
+</svg>
