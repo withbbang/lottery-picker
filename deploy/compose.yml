@@ -57,6 +57,7 @@ services:
       TOTP_SECRET: ${TOTP_SECRET:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_FAMILY_CHAT_ID: ${TELEGRAM_FAMILY_CHAT_ID:-}
       SCHEDULING_ENABLED: ${SCHEDULING_ENABLED:-true}
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
     depends_on:

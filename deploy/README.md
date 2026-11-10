@@ -106,6 +106,7 @@ vi deploy/.env
 | `DB_URL` | 비워 둔다 (`jdbc:mysql://mysql:3306/lottery`) |
 | `TOTP_SECRET` | 1-4에서 채운다. 지금은 비워 둔다 |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | 텔레그램 봇 값 |
+| `TELEGRAM_FAMILY_CHAT_ID` | 선택. 가족방 id. 비우면 가족방을 쓰지 않는다 |
 | `SCHEDULING_ENABLED` | 비워 둔다 (운영은 기본 `true`) |
 | `IMAGE_TAG` | 비워 둔다. 워크플로가 배포할 때마다 커밋 SHA를 써 넣는다 |
 
