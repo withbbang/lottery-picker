@@ -7,11 +7,16 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { monthDay } from "@/lib/format-date";
 import { evidenceStatsHref } from "@/lib/number-stats-link";
+import { recommendationShareText } from "@/lib/share-text";
 import { LottoBall } from "@/components/lotto/LottoBall";
 import {
   EvidenceButton,
   EvidencePanel,
 } from "@/components/recommendation/EvidencePanel";
+import {
+  CopyLineButton,
+  ShareSetButton,
+} from "@/components/recommendation/ShareButtons";
 import type {
   RecommendationSetResponse,
   StrategyType,
@@ -118,6 +123,7 @@ export function RecommendationCard() {
       {combinedLines.length > 0 && (
         <CombinedSlip date={data.date} lines={combinedLines} />
       )}
+      <ShareSetButton text={recommendationShareText(data)} />
       <div className="flex flex-col gap-1 text-sm">
         <p className="text-muted tabular-nums">
           분석 범위: {data.historyFromRound}~{data.historyToRound}회
@@ -175,6 +181,7 @@ function SlipLine({
   const statsHref = evidenceStatsHref(date, line);
   // 근거 문구도 통계 링크도 없으면 열어도 빈 상자라 버튼을 두지 않는다.
   const hasEvidence = line.evidence.length > 0 || statsHref !== null;
+  const name = title ?? STRATEGY_LABELS[line.strategy];
 
   return (
     <article className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2.5 border-t border-slip/25 px-4 py-3">
@@ -185,9 +192,7 @@ function SlipLine({
         {letter}
       </span>
       <h2 className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-        <span className="text-sm font-semibold">
-          {title ?? STRATEGY_LABELS[line.strategy]}
-        </span>
+        <span className="text-sm font-semibold">{name}</span>
         {title === undefined && (
           <>
             {" "}
@@ -197,13 +202,16 @@ function SlipLine({
           </>
         )}
       </h2>
-      {hasEvidence && (
-        <EvidenceButton
-          open={open}
-          controls={evidenceId}
-          onToggle={() => setOpen((value) => !value)}
-        />
-      )}
+      <div className="flex gap-1.5">
+        <CopyLineButton numbers={line.numbers} label={name} />
+        {hasEvidence && (
+          <EvidenceButton
+            open={open}
+            controls={evidenceId}
+            onToggle={() => setOpen((value) => !value)}
+          />
+        )}
+      </div>
       {/* 공 줄과 근거 상자는 칸 이름 열부터 용지 안쪽 폭을 다 쓴다(최근 당첨번호와 같은 배치). */}
       <div className="col-span-full flex flex-col gap-2.5">
         <div className="flex w-full items-center justify-between">

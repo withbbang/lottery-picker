@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecommendationCard } from "@/components/recommendation/RecommendationCard";
+import { recommendationShareText } from "@/lib/share-text";
 import type { RecommendationSetResponse } from "@/types/api/recommendation";
 
 const fetchMock = vi.fn();
@@ -454,5 +455,86 @@ describe("RecommendationCard", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "추천을 불러오지 못했습니다.",
     );
+  });
+
+  describe("copy and share", () => {
+    const combined: RecommendationSetResponse["lines"] = [
+      {
+        strategy: "COMBINED" as const,
+        numbers: [7, 12, 24, 37, 39, 40],
+        evidence: [],
+        relaxation: "NONE" as const,
+        evidenceNumbers: [],
+        statsMetric: null,
+      },
+      {
+        strategy: "COMBINED" as const,
+        numbers: [7, 12, 24, 29, 37, 39],
+        evidence: [],
+        relaxation: "NONE" as const,
+        evidenceNumbers: [],
+        statsMetric: null,
+      },
+    ];
+    const fullSet = { ...set, lines: [...set.lines, ...combined] };
+
+    function respondWith(data: RecommendationSetResponse) {
+      fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ success: true, data })),
+      );
+    }
+
+    it("copies a line from its copy button", async () => {
+      // given
+      respondWith(set);
+      const user = userEvent.setup();
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { clipboard: { writeText } });
+      renderCard();
+      const [first] = await screen.findAllByRole("article");
+
+      // when
+      await user.click(
+        within(first).getByRole("button", { name: "최근 빈도 번호 복사" }),
+      );
+
+      // then
+      expect(writeText).toHaveBeenCalledWith("1 8 15 22 33 45");
+    });
+
+    it("names combined line copy buttons with their number", async () => {
+      // given
+      respondWith(fullSet);
+
+      // when
+      renderCard();
+
+      // then
+      expect(
+        await screen.findByRole("button", { name: "근거 조합 1 번호 복사" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "근거 조합 2 번호 복사" }),
+      ).toBeInTheDocument();
+    });
+
+    it("shares the whole recommendation", async () => {
+      // given
+      respondWith(fullSet);
+      const user = userEvent.setup();
+      const share = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { share });
+      renderCard();
+
+      // when
+      await user.click(
+        await screen.findByRole("button", { name: "번호 공유" }),
+      );
+
+      // then
+      expect(share).toHaveBeenCalledWith({
+        text: recommendationShareText(fullSet),
+      });
+    });
   });
 });
