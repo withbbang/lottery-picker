@@ -9,7 +9,11 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.lotterypicker.bot.dto.BotMenuItem;
+import com.lotterypicker.bot.dto.TelegramUpdate;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.restclient.test.autoconfigure.RestClientTest;
@@ -93,6 +97,78 @@ class TelegramClientTest {
 		assertThat(new TelegramClient(RestClient.builder(), base, TOKEN, "42").isConfigured()).isTrue();
 		assertThat(new TelegramClient(RestClient.builder(), base, "", "42").isConfigured()).isFalse();
 		assertThat(new TelegramClient(RestClient.builder(), base, TOKEN, "").isConfigured()).isFalse();
+	}
+
+	private static final String UPDATES_URL = "https://api.telegram.org/bot" + TOKEN + "/getUpdates";
+
+	@Test
+	void getUpdates로_offset과_대기시간을_보내고_메시지를_읽는다() {
+		// given
+		server.expect(requestTo(UPDATES_URL))
+			.andExpect(method(HttpMethod.POST))
+			.andExpect(jsonPath("$.offset").value(7))
+			.andExpect(jsonPath("$.timeout").value(20))
+			.andExpect(jsonPath("$.allowed_updates[0]").value("message"))
+			.andRespond(withSuccess("""
+				{"ok":true,"result":[
+				  {"update_id":7,"message":{"message_id":1,"date":1762750000,"chat":{"id":42},"text":"/today"}},
+				  {"update_id":8,"message":{"message_id":2,"date":1762750060,"chat":{"id":43},"text":"/help"}}
+				]}""", MediaType.APPLICATION_JSON));
+
+		// when
+		List<TelegramUpdate> updates = client.getUpdates(7, 20);
+
+		// then
+		assertThat(updates).containsExactly(
+			new TelegramUpdate(7, 42L, "/today", Instant.ofEpochSecond(1762750000)),
+			new TelegramUpdate(8, 43L, "/help", Instant.ofEpochSecond(1762750060)));
+	}
+
+	@Test
+	void 메시지가_없는_업데이트는_본문이_비어_있다() {
+		// given
+		server.expect(requestTo(UPDATES_URL))
+			.andRespond(withSuccess("{\"ok\":true,\"result\":[{\"update_id\":8}]}", MediaType.APPLICATION_JSON));
+
+		// when
+		List<TelegramUpdate> updates = client.getUpdates(0, 20);
+
+		// then
+		assertThat(updates).containsExactly(new TelegramUpdate(8, null, null, null));
+	}
+
+	@Test
+	void getUpdates_실패는_토큰_없는_예외다() {
+		// given
+		server.expect(requestTo(UPDATES_URL)).andRespond(withServerError());
+
+		// when, then
+		assertThatThrownBy(() -> client.getUpdates(0, 20)).isInstanceOf(TelegramException.class)
+			.hasMessageNotContaining(TOKEN)
+			.hasNoCause();
+	}
+
+	@Test
+	void 명령_메뉴를_등록한다() {
+		// given
+		server.expect(requestTo("https://api.telegram.org/bot" + TOKEN + "/setMyCommands"))
+			.andExpect(method(HttpMethod.POST))
+			.andExpect(jsonPath("$.commands[0].command").value("today"))
+			.andExpect(jsonPath("$.commands[0].description").value("오늘 추천"))
+			.andRespond(withSuccess("{\"ok\":true,\"result\":true}", MediaType.APPLICATION_JSON));
+
+		// when
+		client.setMyCommands(List.of(new BotMenuItem("today", "오늘 추천")));
+
+		// then
+		server.verify();
+	}
+
+	@Test
+	void 설정된_채팅만_허용한다() {
+		// given / when / then
+		assertThat(client.isAllowedChat(42)).isTrue();
+		assertThat(client.isAllowedChat(43)).isFalse();
 	}
 
 }
