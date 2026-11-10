@@ -18,6 +18,7 @@
 | 중복 방지 | `notification_log`의 `(kind, target_key)` 유니크. 같은 알림은 한 번만 보낸다                       |
 | 실패 처리 | 5초 간격 최대 3회 시도 후 `FAILED`. 추천은 유지하고 웹 카드에 `텔레그램 발송 실패` 표시. 재발송을 포함해 발송은 최대 3번(누적 9회 시도)까지만 한다 |
 | 미설정    | `TELEGRAM_BOT_TOKEN` 또는 `TELEGRAM_CHAT_ID`가 비면 보내지 않고 기록도 남기지 않음 (`SKIPPED`)     |
+| 가족방    | `TELEGRAM_FAMILY_CHAT_ID`를 설정하면 일일 추천·추첨 종료 알림을 가족방에도 보낸다. 오류 알림(추천 생성 실패·수집 실패·수집 오류)은 운영자 방에만. 가족방 기록은 `target_key` 앞에 `family:`를 붙여 따로 남기고, 실패한 방만 다시 보낸다 |
 
 ## 구현된 메시지
 
@@ -173,7 +174,7 @@
 
 ## 명령 응답
 
-`BotMessageFormatter`. 설정된 채팅(`TELEGRAM_CHAT_ID`)에서 보낸 명령에만 답한다. 다른 채팅은 무응답, 보낸 지 10분 넘은 명령도 무응답. `/start`는 `/help`와 같다. `/round@봇이름 1249`처럼 봇 이름이 붙어도 같은 명령이다.
+`BotMessageFormatter`. 설정된 채팅(`TELEGRAM_CHAT_ID`, 설정했으면 `TELEGRAM_FAMILY_CHAT_ID`)에서 보낸 명령에만 답한다. 다른 채팅은 무응답, 보낸 지 10분 넘은 명령도 무응답. `/start`는 `/help`와 같다. `/round@봇이름 1249`처럼 봇 이름이 붙어도 같은 명령이다.
 
 | 명령 | 답 |
 | --- | --- |
@@ -187,7 +188,9 @@
 | 모르는 명령·일반 글 | `모르는 명령입니다. /help 로 명령 목록을 볼 수 있습니다.` |
 | 처리 중 예외 | `처리 중 오류가 났습니다. 잠시 후 다시 시도해 주세요.` |
 
-`/` 메뉴(시작할 때 `setMyCommands`로 등록): today 오늘 추천 · result 최근 회차 채점 결과 · performance 전략별 성적표 · round 회차 당첨 정보 (예: /round 1249) · stats 번호 통계 상위 5개 · settings 고정·제외 번호 보기 · help 명령 목록
+가족방에서는 `/settings`를 모르는 명령으로 답하고 `/help`·메뉴에서도 뺀다. `/`로 시작하지 않는 글에는 답하지 않는다.
+
+`/` 메뉴(시작할 때 `setMyCommands`로 등록, 가족방은 `settings`를 뺀 목록을 그 방 범위로 따로 등록): today 오늘 추천 · result 최근 회차 채점 결과 · performance 전략별 성적표 · round 회차 당첨 정보 (예: /round 1249) · stats 번호 통계 상위 5개 · settings 고정·제외 번호 보기 · help 명령 목록
 
 `/round 1249`
 
