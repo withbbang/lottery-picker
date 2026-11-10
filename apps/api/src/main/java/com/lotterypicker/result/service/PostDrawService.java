@@ -27,6 +27,7 @@ import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 당첨번호가 저장된 회차의 추천과 대조군을 채점하고 추첨 종료 알림을 한 번 보낸다.
@@ -84,6 +85,15 @@ public class PostDrawService {
 					.ifPresent(this::process);
 			}
 		});
+	}
+
+	/** 채점 결과가 있는 가장 최근 회차를 추첨 종료 알림과 같은 요약으로. 채점도 알림도 하지 않는다. */
+	@Transactional(readOnly = true)
+	public Optional<DrawSummary> latestSummary() {
+		return results.findFirstByOrderByRoundNoDesc()
+			.flatMap(latest -> rounds.findById(latest.getRoundNo()))
+			.map(drawn -> summarize(drawn, recommendations.findByRoundNoOrderByDateAscLineIndexAsc(drawn.getRoundNo()),
+					results.findByRoundNo(drawn.getRoundNo())));
 	}
 
 	private static boolean withinNotifyWindow(LottoRound round, LocalDate today) {

@@ -2,6 +2,7 @@ package com.lotterypicker.result.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -371,6 +372,39 @@ class PostDrawServiceTest {
 		// then
 		assertThat(before).containsExactly(1249);
 		assertThat(after).isEmpty();
+	}
+
+	@Test
+	void 최근_채점_회차를_알림과_같은_요약으로_준다() {
+		// given: 1248·1249회 모두 채점했다
+		rounds.save(round(1248, DRAW_DATE.minusDays(7), LocalDateTime.of(2026, 10, 31, 20, 45)));
+		rounds.save(round(1249, DRAW_DATE, LocalDateTime.of(2026, 11, 7, 20, 45)));
+		saveWeek(1248, DRAW_DATE.minusDays(7));
+		saveWeek(1249, DRAW_DATE);
+		PostDrawService service = serviceOn("2026-11-08T10:00");
+		service.process(1248);
+		service.process(1249);
+		clearInvocations(telegram);
+
+		// when
+		var summary = service.latestSummary();
+
+		// then
+		assertThat(summary).hasValueSatisfying(s -> {
+			assertThat(s.round()).isEqualTo(1249);
+			assertThat(s.tally().lineCount()).isEqualTo(35);
+			assertThat(s.tally().bestRank()).isEqualTo(PrizeRank.FOURTH);
+		});
+		verify(telegram, never()).send(anyString());
+	}
+
+	@Test
+	void 채점한_회차가_없으면_빈_값() {
+		// given
+		rounds.save(round(1249, DRAW_DATE, LocalDateTime.of(2026, 11, 7, 20, 45)));
+
+		// when / then
+		assertThat(serviceOn("2026-11-08T10:00").latestSummary()).isEmpty();
 	}
 
 }
