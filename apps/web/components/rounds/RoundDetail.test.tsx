@@ -139,7 +139,9 @@ describe("RoundDetail", () => {
     renderDetail(1);
 
     // then
-    expect(await screen.findByText("판매점 정보가 없습니다.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("판매점 정보가 없습니다."),
+    ).toBeInTheDocument();
   });
 
   it("states that ranks 3 to 5 have no region data", async () => {

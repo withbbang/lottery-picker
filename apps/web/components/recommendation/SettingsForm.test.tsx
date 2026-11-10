@@ -123,9 +123,9 @@ describe("SettingsForm", () => {
     });
 
     // then
-    expect(
-      client.getQueryState(["recommendation-settings"])?.status,
-    ).toBe("error");
+    expect(client.getQueryState(["recommendation-settings"])?.status).toBe(
+      "error",
+    );
     expect(screen.getByRole("textbox", { name: "고정 번호" })).toHaveValue(
       "7, 3",
     );

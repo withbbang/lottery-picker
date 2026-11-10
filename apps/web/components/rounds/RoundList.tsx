@@ -57,11 +57,7 @@ export function RoundList() {
           </li>
         ))}
       </ul>
-      <Pagination
-        page={page}
-        totalPages={data.totalPages}
-        onChange={setPage}
-      />
+      <Pagination page={page} totalPages={data.totalPages} onChange={setPage} />
     </div>
   );
 }

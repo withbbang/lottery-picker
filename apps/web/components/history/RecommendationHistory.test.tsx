@@ -71,9 +71,7 @@ describe("RecommendationHistory", () => {
     renderHistory();
 
     // then
-    expect(
-      await screen.findByText(/아직 추천이 없습니다/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/아직 추천이 없습니다/)).toBeInTheDocument();
   });
 
   it("shows each day with its round and the server's per-line results", async () => {

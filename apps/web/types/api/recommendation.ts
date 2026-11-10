@@ -1,12 +1,7 @@
 import type { NumberMetric } from "@/types/api/statistics";
 
 export type StrategyType =
-  | "RECENT_HOT"
-  | "LONG_COLD"
-  | "ALL_TIME"
-  | "PAIR"
-  | "BALANCED"
-  | "COMBINED";
+  "RECENT_HOT" | "LONG_COLD" | "ALL_TIME" | "PAIR" | "BALANCED" | "COMBINED";
 
 export type Relaxation = "NONE" | "OVERLAP" | "OVERLAP_AND_POPULARITY";
 

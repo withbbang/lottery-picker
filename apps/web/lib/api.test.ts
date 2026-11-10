@@ -28,10 +28,7 @@ describe("apiFetch", () => {
     const data = await apiFetch<{ status: string }>("/api/v1/health");
 
     // then
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/health",
-      undefined,
-    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/health", undefined);
     expect(data).toEqual({ status: "UP" });
   });
 

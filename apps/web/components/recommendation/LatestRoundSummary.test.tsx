@@ -81,7 +81,14 @@ describe("LatestRoundSummary", () => {
               data: {
                 round: 1248,
                 lines: [],
-                rankCounts: { FIRST: 0, SECOND: 0, THIRD: 0, FOURTH: 0, FIFTH: 0, NONE: 0 },
+                rankCounts: {
+                  FIRST: 0,
+                  SECOND: 0,
+                  THIRD: 0,
+                  FOURTH: 0,
+                  FIFTH: 0,
+                  NONE: 0,
+                },
                 prizeTotal: 0,
                 cost: 0,
                 profit: 0,
@@ -99,7 +106,9 @@ describe("LatestRoundSummary", () => {
           ]),
     );
     renderSummary();
-    const toggle = await screen.findByRole("button", { name: /추첨 결과 보기/ });
+    const toggle = await screen.findByRole("button", {
+      name: /추첨 결과 보기/,
+    });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     // when
@@ -107,7 +116,10 @@ describe("LatestRoundSummary", () => {
 
     // then
     expect(await screen.findByText("아직 추첨 전입니다.")).toBeVisible();
-    expect(fetchMock).toHaveBeenCalledWith("/api/v1/rounds/1248/results", undefined);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/rounds/1248/results",
+      undefined,
+    );
   });
 
   it("says so when no round is stored", async () => {

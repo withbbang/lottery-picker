@@ -31,7 +31,9 @@ export function LottoBall({
   const tone = missed
     ? "border border-rule font-medium text-muted"
     : `font-bold text-ball-ink ${ballColor(value)}`;
-  const ring = bonus ? "ring-2 ring-slip ring-offset-2 ring-offset-surface" : "";
+  const ring = bonus
+    ? "ring-2 ring-slip ring-offset-2 ring-offset-surface"
+    : "";
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center rounded-full tabular-nums ${tone} ${ring} ${SIZES[size]}`}
