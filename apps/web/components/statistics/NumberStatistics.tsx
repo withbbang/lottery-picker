@@ -6,13 +6,13 @@ import { useQuery } from "@tanstack/react-query";
 
 import { LottoBall } from "@/components/lotto/LottoBall";
 import { ApiError, apiFetch } from "@/lib/api";
-import type {
-  NumberMetric,
-  NumberStatisticsResponse,
-  RankedNumberResponse,
+import { monthDay } from "@/lib/format-date";
+import {
+  NUMBER_METRICS,
+  type NumberMetric,
+  type NumberStatisticsResponse,
+  type RankedNumberResponse,
 } from "@/types/api/statistics";
-
-const TAB_ORDER: readonly NumberMetric[] = ["RECENT", "COLD", "ALL_TIME"];
 
 function tabLabel(metric: NumberMetric, recentWindow: number) {
   switch (metric) {
@@ -35,12 +35,6 @@ function valueText(metric: NumberMetric, value: number) {
 
 function rankText(row: RankedNumberResponse) {
   return row.tied ? `공동 ${row.rank}위` : `${row.rank}위`;
-}
-
-/** "2026-11-05" → "11월 5일". 날짜 계산 없이 문자열만 나눈다. */
-function monthDay(date: string) {
-  const [, month, day] = date.split("-");
-  return `${Number(month)}월 ${Number(day)}일`;
 }
 
 // 204면 apiFetch가 undefined를 주는데, React Query는 undefined 결과를 오류로 본다.
@@ -97,8 +91,8 @@ export function NumberStatistics({
   const picked = highlight
     .map((n) => rows.find((row) => row.number === n))
     .filter((row): row is RankedNumberResponse => row !== undefined);
-  // 막대 길이의 기준. 첫 행이 가장 큰 값이다(서버가 정렬해서 준다).
-  const scale = Math.max(rows[0]?.value ?? 0, 1);
+  // 막대 길이의 기준. 서버 정렬 순서에 기대지 않고 가장 큰 값을 쓴다.
+  const scale = Math.max(1, ...rows.map((row) => row.value));
 
   return (
     <div className="flex flex-col gap-4">
@@ -112,7 +106,7 @@ export function NumberStatistics({
         aria-label="통계 기준"
         className="grid grid-cols-3 gap-1 rounded-lg border border-rule bg-surface p-1"
       >
-        {TAB_ORDER.map((m) => (
+        {NUMBER_METRICS.map((m) => (
           <button
             key={m}
             type="button"

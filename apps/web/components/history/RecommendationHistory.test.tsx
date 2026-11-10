@@ -175,6 +175,28 @@ describe("RecommendationHistory", () => {
     expect(button).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("hides the evidence toggle on a line with nothing to show", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      respond([
+        {
+          date: "2026-11-07",
+          round: 1249,
+          lines: [line({ evidence: [] })],
+        },
+      ]),
+    );
+
+    // when
+    renderHistory();
+    await screen.findByText("11월 7일");
+
+    // then
+    expect(
+      screen.queryByRole("button", { name: /근거/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("links past evidence to the statistics of that date", async () => {
     // given
     fetchMock.mockResolvedValue(

@@ -67,6 +67,18 @@ describe("parseNumberStatsParams", () => {
     expect(parseNumberStatsParams(params).highlight).toEqual([7, 12]);
   });
 
+  it("returns null date for a day that is not on the calendar", () => {
+    expect(
+      parseNumberStatsParams(new URLSearchParams("date=2026-02-30")).date,
+    ).toBeNull();
+    expect(
+      parseNumberStatsParams(new URLSearchParams("date=2026-13-01")).date,
+    ).toBeNull();
+    expect(
+      parseNumberStatsParams(new URLSearchParams("date=2028-02-29")).date,
+    ).toBe("2028-02-29");
+  });
+
   it("returns null date when date is missing or malformed", () => {
     expect(parseNumberStatsParams(new URLSearchParams("")).date).toBeNull();
     expect(

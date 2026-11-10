@@ -230,6 +230,30 @@ describe("NumberStatistics", () => {
     expect(await screen.findByText("21회째")).toBeInTheDocument();
   });
 
+  it("scales bars to the largest value even when it is not the first row", async () => {
+    // given: 서버 정렬과 무관하게 가장 큰 값이 막대 끝이 되어야 한다
+    fetchMock.mockResolvedValue(
+      respond({
+        ...stats,
+        metrics: {
+          ...stats.metrics,
+          RECENT: ranked([
+            [3, 2, 2, false],
+            [9, 5, 1, false],
+          ]),
+        },
+      }),
+    );
+
+    // when
+    renderStats();
+    await screen.findByRole("list", { name: "번호 순위" });
+
+    // then
+    const meters = document.querySelectorAll("meter");
+    expect([...meters].map((m) => m.getAttribute("max"))).toEqual(["5", "5"]);
+  });
+
   it("explains when the recommendation for the date does not exist", async () => {
     // given
     fetchMock.mockResolvedValue(

@@ -1,6 +1,5 @@
-import type { NumberMetric } from "@/types/api/statistics";
+import { NUMBER_METRICS, type NumberMetric } from "@/types/api/statistics";
 
-const METRICS: readonly NumberMetric[] = ["RECENT", "COLD", "ALL_TIME"];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type NumberStatsParams = {
@@ -8,6 +7,20 @@ export type NumberStatsParams = {
   metric: NumberMetric;
   highlight: number[];
 };
+
+/** "YYYY-MM-DD" 모양이면서 달력에 있는 날인지. 2026-02-30처럼 없는 날은 서버가 400을 준다. */
+function isCalendarDate(date: string) {
+  if (!DATE.test(date)) {
+    return false;
+  }
+  const [year, month, day] = date.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
 
 /** 추천 근거에서 번호 통계 화면으로 가는 주소. 강조할 번호는 서버가 준 근거 번호를 그대로 넘긴다. */
 export function numberStatsHref(
@@ -49,8 +62,8 @@ export function parseNumberStatsParams(
     .map(Number)
     .filter((n) => n >= 1 && n <= 45);
   return {
-    date: date !== null && DATE.test(date) ? date : null,
-    metric: METRICS.find((m) => m === metric) ?? "RECENT",
+    date: date !== null && isCalendarDate(date) ? date : null,
+    metric: NUMBER_METRICS.find((m) => m === metric) ?? "RECENT",
     highlight,
   };
 }

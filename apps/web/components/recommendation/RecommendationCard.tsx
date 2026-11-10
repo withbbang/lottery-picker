@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
+import { monthDay } from "@/lib/format-date";
 import { evidenceStatsHref } from "@/lib/number-stats-link";
 import { LottoBall } from "@/components/lotto/LottoBall";
 import {
@@ -34,12 +35,6 @@ export const STRATEGY_DESCRIPTIONS: Record<StrategyType, string> = {
   BALANCED: "홀짝·합계가 고른 조합",
   COMBINED: "각 전략 근거 번호를 모은 조합",
 };
-
-/** "2026-11-05" → "11월 5일". 날짜 계산 없이 문자열만 나눈다. */
-function monthDay(date: string) {
-  const [, month, day] = date.split("-");
-  return `${Number(month)}월 ${Number(day)}일`;
-}
 
 /** 로또 용지의 게임 칸 이름. 줄 순서대로 A, B, C… */
 function gameLetter(index: number) {
@@ -177,6 +172,9 @@ function SlipLine({
 }) {
   const [open, setOpen] = useState(false);
   const evidenceId = useId();
+  const statsHref = evidenceStatsHref(date, line);
+  // 근거 문구도 통계 링크도 없으면 열어도 빈 상자라 버튼을 두지 않는다.
+  const hasEvidence = line.evidence.length > 0 || statsHref !== null;
 
   return (
     <article className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2.5 border-t border-slip/25 px-4 py-3">
@@ -199,11 +197,13 @@ function SlipLine({
           </>
         )}
       </h2>
-      <EvidenceButton
-        open={open}
-        controls={evidenceId}
-        onToggle={() => setOpen((value) => !value)}
-      />
+      {hasEvidence && (
+        <EvidenceButton
+          open={open}
+          controls={evidenceId}
+          onToggle={() => setOpen((value) => !value)}
+        />
+      )}
       {/* 공 줄과 근거 상자는 칸 이름 열부터 용지 안쪽 폭을 다 쓴다(최근 당첨번호와 같은 배치). */}
       <div className="col-span-full flex flex-col gap-2.5">
         <div className="flex w-full items-center justify-between">
@@ -211,12 +211,14 @@ function SlipLine({
             <LottoBall key={n} value={n} />
           ))}
         </div>
-        <EvidencePanel
-          id={evidenceId}
-          open={open}
-          evidence={line.evidence}
-          statsHref={evidenceStatsHref(date, line)}
-        />
+        {hasEvidence && (
+          <EvidencePanel
+            id={evidenceId}
+            open={open}
+            evidence={line.evidence}
+            statsHref={statsHref}
+          />
+        )}
       </div>
     </article>
   );

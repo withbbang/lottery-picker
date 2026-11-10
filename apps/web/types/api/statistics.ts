@@ -1,5 +1,7 @@
-/** 번호 통계 지표. 최근 50회 출현 / 미출현 회차 / 전체 출현. */
-export type NumberMetric = "RECENT" | "COLD" | "ALL_TIME";
+export const NUMBER_METRICS = ["RECENT", "COLD", "ALL_TIME"] as const;
+
+/** 번호 통계 지표. 최근 50회 출현 / 미출현 회차 / 전체 출현. 탭 순서도 이 순서다. */
+export type NumberMetric = (typeof NUMBER_METRICS)[number];
 
 export type RankedNumberResponse = {
   number: number;

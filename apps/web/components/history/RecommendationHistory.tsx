@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
+import { monthDay } from "@/lib/format-date";
 import { evidenceStatsHref } from "@/lib/number-stats-link";
 import { LottoBall } from "@/components/lotto/LottoBall";
 import {
@@ -36,12 +37,6 @@ const WINNING_RANKS: PrizeRank[] = [
 
 type Day = RecommendationHistoryResponse;
 type Line = Day["lines"][number];
-
-/** "2026-11-05" → "11월 5일". 날짜 계산 없이 문자열만 나눈다. */
-function monthDay(date: string) {
-  const [, month, day] = date.split("-");
-  return `${Number(month)}월 ${Number(day)}일`;
-}
 
 type Verdict =
   { kind: "pending" } | { kind: "lost" } | { kind: "won"; best: PrizeRank };
@@ -167,6 +162,9 @@ function HistoryLine({
 }) {
   const [open, setOpen] = useState(false);
   const evidenceId = useId();
+  const statsHref = evidenceStatsHref(date, line);
+  // 근거 문구도 통계 링크도 없으면 열어도 빈 상자라 버튼을 두지 않는다.
+  const hasEvidence = line.evidence.length > 0 || statsHref !== null;
   // 채점 전이면 null이라 모든 공을 그대로 칠한다.
   const matched = line.matchedNumbers;
   const bonus = line.matchedBonus;
@@ -177,11 +175,13 @@ function HistoryLine({
       <div className="flex items-center justify-between gap-3 text-sm tabular-nums">
         <span className="flex items-center gap-2">
           <span className="text-muted">{title}</span>
-          <EvidenceButton
-            open={open}
-            controls={evidenceId}
-            onToggle={() => setOpen((value) => !value)}
-          />
+          {hasEvidence && (
+            <EvidenceButton
+              open={open}
+              controls={evidenceId}
+              onToggle={() => setOpen((value) => !value)}
+            />
+          )}
         </span>
         {line.matchCount !== null && line.prizeRank !== null && (
           <span className="flex items-baseline gap-1.5">
@@ -208,12 +208,14 @@ function HistoryLine({
           />
         ))}
       </p>
-      <EvidencePanel
-        id={evidenceId}
-        open={open}
-        evidence={line.evidence}
-        statsHref={evidenceStatsHref(date, line)}
-      />
+      {hasEvidence && (
+        <EvidencePanel
+          id={evidenceId}
+          open={open}
+          evidence={line.evidence}
+          statsHref={statsHref}
+        />
+      )}
     </li>
   );
 }
