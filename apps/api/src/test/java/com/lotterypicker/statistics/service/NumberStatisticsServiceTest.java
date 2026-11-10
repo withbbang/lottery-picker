@@ -3,6 +3,8 @@ package com.lotterypicker.statistics.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -88,7 +90,7 @@ class NumberStatisticsServiceTest {
 		// given: 추천은 1~2회로 만들었고, 3회는 나중에 수집됐다
 		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9))
 			.willReturn(List.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
-		given(rounds.findByRoundNoBetweenOrderByRoundNoAsc(1, 2))
+		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(2), any()))
 			.willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6), round(2, 1, 7, 8, 9, 10, 11)));
 
 		// when
@@ -103,24 +105,37 @@ class NumberStatisticsServiceTest {
 	}
 
 	@Test
-	void 같은_회차_범위는_한_번만_계산한다() {
-		// given: 날짜가 달라도 회차 범위가 같으면 결과 순위가 같다
+	void 추천을_만든_뒤_수집된_회차는_빼고_계산한다() {
+		// given: 추천은 11월 9일 17시에 만들었다. 범위 안의 빠진 회차가 그 뒤에 채워질 수 있다
 		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9))
 			.willReturn(List.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
-		given(recommendations.findByDateOrderByLineIndexAsc(NOV_10))
-			.willReturn(List.of(line(NOV_10, StrategyType.RECENT_HOT, 1, 2)));
-		given(rounds.findByRoundNoBetweenOrderByRoundNoAsc(1, 2))
+		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(1, 2, NOV_9.atTime(17, 0)))
+			.willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6)));
+
+		// when
+		NumberStatisticsResponse response = service.find(NOV_9).orElseThrow();
+
+		// then: 추천 시각까지 수집된 회차만 센다
+		verify(rounds).findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(2),
+				eq(NOV_9.atTime(17, 0)));
+		assertThat(response.totalRounds()).isEqualTo(1);
+	}
+
+	@Test
+	void 같은_추천의_통계는_한_번만_계산한다() {
+		// given: 같은 날짜를 두 번 본다
+		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9))
+			.willReturn(List.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
+		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(2), any()))
 			.willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6), round(2, 1, 7, 8, 9, 10, 11)));
 
 		// when
 		NumberStatisticsResponse first = service.find(NOV_9).orElseThrow();
-		NumberStatisticsResponse second = service.find(NOV_10).orElseThrow();
+		NumberStatisticsResponse second = service.find(NOV_9).orElseThrow();
 
-		// then: 회차는 한 번만 읽고, 응답 날짜는 각자의 추천 날짜다
-		verify(rounds, times(1)).findByRoundNoBetweenOrderByRoundNoAsc(1, 2);
-		assertThat(first.date()).isEqualTo(NOV_9);
-		assertThat(second.date()).isEqualTo(NOV_10);
-		assertThat(second.metrics()).isEqualTo(first.metrics());
+		// then: 회차는 한 번만 읽는다
+		verify(rounds, times(1)).findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(2), any());
+		assertThat(second).isEqualTo(first);
 	}
 
 	@Test
@@ -128,7 +143,7 @@ class NumberStatisticsServiceTest {
 		// given: 정렬상 대조군이 먼저 와도 추천 줄의 범위를 쓴다
 		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9)).willReturn(
 				List.of(line(NOV_9, StrategyType.CONTROL, 5, 9), line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
-		given(rounds.findByRoundNoBetweenOrderByRoundNoAsc(1, 2))
+		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(2), any()))
 			.willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6), round(2, 1, 7, 8, 9, 10, 11)));
 
 		// when
@@ -143,7 +158,7 @@ class NumberStatisticsServiceTest {
 		// given
 		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9))
 			.willReturn(List.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 1)));
-		given(rounds.findByRoundNoBetweenOrderByRoundNoAsc(1, 1)).willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6)));
+		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(1), any())).willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6)));
 
 		// when
 		NumberStatisticsResponse response = service.find(NOV_9).orElseThrow();
@@ -161,7 +176,7 @@ class NumberStatisticsServiceTest {
 		DailyRecommendation latest = line(NOV_10, StrategyType.RECENT_HOT, 1, 1);
 		given(recommendations.findFirstByDateLessThanEqualOrderByDateDesc(NOV_10)).willReturn(Optional.of(latest));
 		given(recommendations.findByDateOrderByLineIndexAsc(NOV_10)).willReturn(List.of(latest));
-		given(rounds.findByRoundNoBetweenOrderByRoundNoAsc(1, 1)).willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6)));
+		given(rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(eq(1), eq(1), any())).willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6)));
 
 		// when
 		Optional<NumberStatisticsResponse> response = service.find(null);

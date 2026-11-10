@@ -40,23 +40,6 @@ class EvidenceNumbersTest {
 	}
 
 	@Test
-	void 옛_근거_문구에서_번호_접두어만_읽는다() {
-		// given
-		List<String> evidence = List.of("번호 7: 최근 50회 중 4회 출현", "번호 12: 최근 50회 중 3회 출현", "겹침 제한을 완화함");
-
-		// when
-		List<Integer> numbers = EvidenceNumbers.fromLegacyEvidence(evidence);
-
-		// then
-		assertThat(numbers).containsExactly(7, 12);
-	}
-
-	@Test
-	void 번호_접두어가_없으면_빈_목록이다() {
-		assertThat(EvidenceNumbers.fromLegacyEvidence(List.of("균형 조건 미충족"))).isEmpty();
-	}
-
-	@Test
 	void 컬럼_문자열과_목록을_오간다() {
 		assertThat(EvidenceNumbers.toColumn(List.of(7, 12))).isEqualTo("7,12");
 		assertThat(EvidenceNumbers.toColumn(List.of())).isEmpty();

@@ -14,6 +14,7 @@ import com.lotterypicker.statistics.dto.NumberStatisticsResponse;
 import com.lotterypicker.statistics.dto.RankedNumberResponse;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
@@ -26,8 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 추천 근거를 확인하는 번호 통계. 그 추천을 만들 때 쓴 회차 범위만으로 계산해 근거 문구의 숫자와 늘 같다.
- * 새 회차가 수집돼도 지난 추천의 통계는 바뀌지 않는다.
+ * 추천 근거를 확인하는 번호 통계. 그 추천을 만들 때 엔진이 본 회차(범위 안, 추천 시각까지 수집된 회차)만으로
+ * 계산해 근거 문구의 숫자와 늘 같다. 새 회차가 수집되거나 빠진 회차가 나중에 채워져도 지난 추천의 통계는 바뀌지 않는다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -39,12 +40,13 @@ public class NumberStatisticsService {
 	private final Clock clock;
 
 	/**
-	 * 회차 범위별 계산 결과. 지난 추천의 범위는 다시 바뀌지 않으므로 처음 계산한 값을 그대로 쓴다.
-	 * 하루에 범위가 하나씩만 늘어 크기 제한은 두지 않는다.
+	 * 추천별 계산 결과. 추천 시각까지 수집된 회차는 다시 바뀌지 않으므로 처음 계산한 값을 그대로 쓴다.
+	 * 추천은 하루에 한 벌씩만 늘어 크기 제한은 두지 않는다.
 	 */
-	private final Map<RoundRange, Ranked> cache = new ConcurrentHashMap<>();
+	private final Map<Basis, Ranked> cache = new ConcurrentHashMap<>();
 
-	private record RoundRange(int from, int to) {
+	/** 엔진이 본 회차를 다시 고르는 기준. 범위 안 빠진 회차가 추천 뒤에 채워져도 같은 회차만 고른다. */
+	private record Basis(int from, int to, LocalDateTime createdAt) {
 	}
 
 	private record Ranked(int totalRounds, Map<NumberMetric, List<RankedNumberResponse>> metrics) {
@@ -69,16 +71,24 @@ public class NumberStatisticsService {
 		return recommendations.findByDateOrderByLineIndexAsc(date).stream().filter(line -> !line.isControl()).findFirst();
 	}
 
-	private NumberStatisticsResponse compute(DailyRecommendation basis) {
-		RoundRange range = new RoundRange(basis.getHistoryFromRound(), basis.getHistoryToRound());
-		Ranked ranked = cache.computeIfAbsent(range, this::rank);
-		return new NumberStatisticsResponse(basis.getDate(), range.from(), range.to(), ranked.totalRounds(),
+	private NumberStatisticsResponse compute(DailyRecommendation recommendation) {
+		Basis basis = new Basis(recommendation.getHistoryFromRound(), recommendation.getHistoryToRound(),
+				recommendation.getCreatedAt());
+		Ranked ranked = cache.get(basis);
+		if (ranked == null) {
+			// 계산은 맵 잠금 밖에서 한다. 동시에 처음 들어온 요청이 같은 값을 두 번 계산해도 결과는 같다.
+			Ranked computed = rank(basis);
+			Ranked previous = cache.putIfAbsent(basis, computed);
+			ranked = previous == null ? computed : previous;
+		}
+		return new NumberStatisticsResponse(recommendation.getDate(), basis.from(), basis.to(), ranked.totalRounds(),
 				RecentHotStrategy.WINDOW, ranked.metrics());
 	}
 
-	private Ranked rank(RoundRange range) {
-		NumberStatistics stats = NumberStatistics.from(
-				DailyRecommendationService.toHistory(rounds.findByRoundNoBetweenOrderByRoundNoAsc(range.from(), range.to())));
+	private Ranked rank(Basis basis) {
+		NumberStatistics stats = NumberStatistics.from(DailyRecommendationService.toHistory(
+				rounds.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(basis.from(), basis.to(),
+						basis.createdAt())));
 		Map<NumberMetric, List<RankedNumberResponse>> metrics = new EnumMap<>(NumberMetric.class);
 		for (NumberMetric metric : NumberMetric.values()) {
 			metrics.put(metric, NumberRanking.rank(stats, metric).stream().map(RankedNumberResponse::from).toList());

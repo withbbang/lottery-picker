@@ -46,10 +46,33 @@ class LottoRoundRepositoryTest {
 		repository.flush();
 
 		// when
-		var ranged = repository.findByRoundNoBetweenOrderByRoundNoAsc(1247, 1248);
+		var ranged = repository.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(1247, 1248, FETCHED_AT);
 
 		// then
 		assertThat(ranged).extracting(LottoRound::getRoundNo).containsExactly(1247, 1248);
+	}
+
+	@Test
+	void 회차_범위에서_기준_시각_뒤에_수집된_회차는_뺀다() {
+		// given: 1247회는 나중에 채워졌다
+		repository.save(round(1246, LocalDate.of(2026, 10, 17)));
+		repository.save(round(1248, LocalDate.of(2026, 10, 31)));
+		LottoRound late = LottoRound.builder()
+			.roundNo(1247)
+			.numbers(new LottoNumbers(List.of(1, 2, 3, 4, 5, 6)))
+			.bonus(7)
+			.drawDate(LocalDate.of(2026, 10, 24))
+			.source("https://www.dhlottery.co.kr")
+			.fetchedAt(FETCHED_AT.plusDays(1))
+			.build();
+		repository.save(late);
+		repository.flush();
+
+		// when
+		var ranged = repository.findByRoundNoBetweenAndFetchedAtLessThanEqualOrderByRoundNoAsc(1246, 1248, FETCHED_AT);
+
+		// then
+		assertThat(ranged).extracting(LottoRound::getRoundNo).containsExactly(1246, 1248);
 	}
 
 	@Test
