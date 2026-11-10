@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.lotterypicker.common.BusinessException;
 import com.lotterypicker.common.ErrorCode;
@@ -98,6 +100,27 @@ class NumberStatisticsServiceTest {
 		assertThat(response.totalRounds()).isEqualTo(2);
 		assertThat(valueOf(response, NumberMetric.ALL_TIME, 1)).isEqualTo(2);
 		assertThat(valueOf(response, NumberMetric.ALL_TIME, 40)).isZero();
+	}
+
+	@Test
+	void 같은_회차_범위는_한_번만_계산한다() {
+		// given: 날짜가 달라도 회차 범위가 같으면 결과 순위가 같다
+		given(recommendations.findByDateOrderByLineIndexAsc(NOV_9))
+			.willReturn(List.of(line(NOV_9, StrategyType.RECENT_HOT, 1, 2)));
+		given(recommendations.findByDateOrderByLineIndexAsc(NOV_10))
+			.willReturn(List.of(line(NOV_10, StrategyType.RECENT_HOT, 1, 2)));
+		given(rounds.findByRoundNoBetweenOrderByRoundNoAsc(1, 2))
+			.willReturn(List.of(round(1, 1, 2, 3, 4, 5, 6), round(2, 1, 7, 8, 9, 10, 11)));
+
+		// when
+		NumberStatisticsResponse first = service.find(NOV_9).orElseThrow();
+		NumberStatisticsResponse second = service.find(NOV_10).orElseThrow();
+
+		// then: 회차는 한 번만 읽고, 응답 날짜는 각자의 추천 날짜다
+		verify(rounds, times(1)).findByRoundNoBetweenOrderByRoundNoAsc(1, 2);
+		assertThat(first.date()).isEqualTo(NOV_9);
+		assertThat(second.date()).isEqualTo(NOV_10);
+		assertThat(second.metrics()).isEqualTo(first.metrics());
 	}
 
 	@Test

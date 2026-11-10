@@ -14,10 +14,12 @@ import com.lotterypicker.statistics.dto.NumberStatisticsResponse;
 import com.lotterypicker.statistics.dto.RankedNumberResponse;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,18 @@ public class NumberStatisticsService {
 	private final DailyRecommendationRepository recommendations;
 	private final LottoRoundRepository rounds;
 	private final Clock clock;
+
+	/**
+	 * 회차 범위별 계산 결과. 지난 추천의 범위는 다시 바뀌지 않으므로 처음 계산한 값을 그대로 쓴다.
+	 * 하루에 범위가 하나씩만 늘어 크기 제한은 두지 않는다.
+	 */
+	private final Map<RoundRange, Ranked> cache = new ConcurrentHashMap<>();
+
+	private record RoundRange(int from, int to) {
+	}
+
+	private record Ranked(int totalRounds, Map<NumberMetric, List<RankedNumberResponse>> metrics) {
+	}
 
 	/**
 	 * @param date 기준 추천 날짜. null이면 오늘 이하 가장 최근 추천.
@@ -56,16 +70,20 @@ public class NumberStatisticsService {
 	}
 
 	private NumberStatisticsResponse compute(DailyRecommendation basis) {
-		int from = basis.getHistoryFromRound();
-		int to = basis.getHistoryToRound();
-		NumberStatistics stats = NumberStatistics
-			.from(DailyRecommendationService.toHistory(rounds.findByRoundNoBetweenOrderByRoundNoAsc(from, to)));
+		RoundRange range = new RoundRange(basis.getHistoryFromRound(), basis.getHistoryToRound());
+		Ranked ranked = cache.computeIfAbsent(range, this::rank);
+		return new NumberStatisticsResponse(basis.getDate(), range.from(), range.to(), ranked.totalRounds(),
+				RecentHotStrategy.WINDOW, ranked.metrics());
+	}
+
+	private Ranked rank(RoundRange range) {
+		NumberStatistics stats = NumberStatistics.from(
+				DailyRecommendationService.toHistory(rounds.findByRoundNoBetweenOrderByRoundNoAsc(range.from(), range.to())));
 		Map<NumberMetric, List<RankedNumberResponse>> metrics = new EnumMap<>(NumberMetric.class);
 		for (NumberMetric metric : NumberMetric.values()) {
 			metrics.put(metric, NumberRanking.rank(stats, metric).stream().map(RankedNumberResponse::from).toList());
 		}
-		return new NumberStatisticsResponse(basis.getDate(), from, to, stats.totalRounds(), RecentHotStrategy.WINDOW,
-				metrics);
+		return new Ranked(stats.totalRounds(), Collections.unmodifiableMap(metrics));
 	}
 
 }
