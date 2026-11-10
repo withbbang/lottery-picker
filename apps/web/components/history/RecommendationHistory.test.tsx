@@ -152,6 +152,59 @@ describe("RecommendationHistory", () => {
     expect(screen.getByText("2등")).toBeInTheDocument();
   });
 
+  it("toggles evidence on a past line", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      respond([
+        {
+          date: "2026-11-07",
+          round: 1249,
+          lines: [line({ evidence: ["번호 30: 18회째 미출현"] })],
+        },
+      ]),
+    );
+    renderHistory();
+    const button = await screen.findByRole("button", { name: /근거/ });
+    expect(screen.getByText("번호 30: 18회째 미출현")).not.toBeVisible();
+
+    // when
+    await userEvent.click(button);
+
+    // then
+    expect(screen.getByText("번호 30: 18회째 미출현")).toBeVisible();
+    expect(button).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("links past evidence to the statistics of that date", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      respond([
+        {
+          date: "2026-11-07",
+          round: 1249,
+          lines: [
+            line({
+              strategy: "LONG_COLD",
+              evidence: ["번호 30: 18회째 미출현"],
+              evidenceNumbers: [30],
+              statsMetric: "COLD",
+            }),
+          ],
+        },
+      ]),
+    );
+    renderHistory();
+
+    // when
+    await userEvent.click(await screen.findByRole("button", { name: /근거/ }));
+
+    // then
+    expect(screen.getByRole("link", { name: "통계에서 보기" })).toHaveAttribute(
+      "href",
+      "/numbers?date=2026-11-07&metric=COLD&highlight=30",
+    );
+  });
+
   it("requests the clicked page", async () => {
     // given
     fetchMock.mockImplementation(async (url: string) => {

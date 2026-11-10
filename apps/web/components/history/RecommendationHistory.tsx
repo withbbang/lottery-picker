@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import Link from "next/link";
 
 import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
+import { evidenceStatsHref } from "@/lib/number-stats-link";
 import { LottoBall } from "@/components/lotto/LottoBall";
+import {
+  EvidenceButton,
+  EvidencePanel,
+} from "@/components/recommendation/EvidencePanel";
 import { STRATEGY_LABELS } from "@/components/recommendation/RecommendationCard";
 import { RANK_LABELS } from "@/components/results/RoundResults";
 import { Pagination } from "@/components/ui/Pagination";
@@ -39,9 +44,7 @@ function monthDay(date: string) {
 }
 
 type Verdict =
-  | { kind: "pending" }
-  | { kind: "lost" }
-  | { kind: "won"; best: PrizeRank };
+  { kind: "pending" } | { kind: "lost" } | { kind: "won"; best: PrizeRank };
 
 /** 하루 용지의 결과. 추첨 전이든 추첨 뒤 채점 대기든 한 줄이라도 채점 전이면 채점 전으로 본다. */
 function dayVerdict(lines: Line[]): Verdict {
@@ -52,9 +55,7 @@ function dayVerdict(lines: Line[]): Verdict {
   const best = WINNING_RANKS.find((rank) =>
     winners.some((l) => l.prizeRank === rank),
   );
-  return best === undefined
-    ? { kind: "lost" }
-    : { kind: "won", best };
+  return best === undefined ? { kind: "lost" } : { kind: "won", best };
 }
 
 /** 근거 조합은 여러 줄이라 "근거 조합 1"처럼 순번을 붙인다. */
@@ -102,11 +103,7 @@ export function RecommendationHistory() {
       {data.items.map((day) => (
         <DaySlip key={day.date} day={day} />
       ))}
-      <Pagination
-        page={page}
-        totalPages={data.totalPages}
-        onChange={setPage}
-      />
+      <Pagination page={page} totalPages={data.totalPages} onChange={setPage} />
     </div>
   );
 }
@@ -133,6 +130,7 @@ function DaySlip({ day }: { day: Day }) {
         {day.lines.map((line, index) => (
           <HistoryLine
             key={`${line.strategy}-${index}`}
+            date={day.date}
             line={line}
             title={titles[index]}
           />
@@ -158,7 +156,17 @@ function VerdictMark({ verdict }: { verdict: Verdict }) {
   );
 }
 
-function HistoryLine({ line, title }: { line: Line; title: string }) {
+function HistoryLine({
+  date,
+  line,
+  title,
+}: {
+  date: string;
+  line: Line;
+  title: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const evidenceId = useId();
   // 채점 전이면 null이라 모든 공을 그대로 칠한다.
   const matched = line.matchedNumbers;
   const bonus = line.matchedBonus;
@@ -166,8 +174,15 @@ function HistoryLine({ line, title }: { line: Line; title: string }) {
 
   return (
     <li className="flex flex-col gap-1.5 border-t border-rule px-4 py-2">
-      <p className="flex items-baseline justify-between gap-3 text-sm tabular-nums">
-        <span className="text-muted">{title}</span>
+      <div className="flex items-center justify-between gap-3 text-sm tabular-nums">
+        <span className="flex items-center gap-2">
+          <span className="text-muted">{title}</span>
+          <EvidenceButton
+            open={open}
+            controls={evidenceId}
+            onToggle={() => setOpen((value) => !value)}
+          />
+        </span>
         {line.matchCount !== null && line.prizeRank !== null && (
           <span className="flex items-baseline gap-1.5">
             <span className="text-muted">
@@ -181,7 +196,7 @@ function HistoryLine({ line, title }: { line: Line; title: string }) {
             )}
           </span>
         )}
-      </p>
+      </div>
       {/* 최근 당첨번호·오늘 추천과 같이 공 줄이 용지 안쪽 폭을 다 쓴다. */}
       <p className="flex w-full items-center justify-between">
         {line.numbers.map((n) => (
@@ -193,6 +208,12 @@ function HistoryLine({ line, title }: { line: Line; title: string }) {
           />
         ))}
       </p>
+      <EvidencePanel
+        id={evidenceId}
+        open={open}
+        evidence={line.evidence}
+        statsHref={evidenceStatsHref(date, line)}
+      />
     </li>
   );
 }

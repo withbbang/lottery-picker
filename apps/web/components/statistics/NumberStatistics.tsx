@@ -173,7 +173,7 @@ export function NumberStatistics({
                   min={0}
                   max={scale}
                   value={row.value}
-                  className={`h-2 w-full appearance-none [&::-moz-meter-bar]:rounded-full [&::-webkit-meter-bar]:border-0 [&::-webkit-meter-bar]:bg-transparent [&::-webkit-meter-optimum-value]:rounded-full ${
+                  className={`h-2 w-full appearance-none bg-none [&::-moz-meter-bar]:rounded-full [&::-moz-meter-bar]:bg-none [&::-webkit-meter-bar]:border-0 [&::-webkit-meter-bar]:bg-transparent [&::-webkit-meter-bar]:bg-none [&::-webkit-meter-optimum-value]:rounded-full [&::-webkit-meter-optimum-value]:bg-none ${
                     marked
                       ? "[&::-moz-meter-bar]:bg-slip [&::-webkit-meter-optimum-value]:bg-slip"
                       : "[&::-moz-meter-bar]:bg-muted/40 [&::-webkit-meter-optimum-value]:bg-muted/40"

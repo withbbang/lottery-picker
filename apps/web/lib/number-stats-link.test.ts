@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  evidenceStatsHref,
   numberStatsHref,
   parseNumberStatsParams,
 } from "@/lib/number-stats-link";
@@ -10,6 +11,35 @@ describe("numberStatsHref", () => {
     expect(numberStatsHref("2026-11-10", "RECENT", [7, 12])).toBe(
       "/numbers?date=2026-11-10&metric=RECENT&highlight=7%2C12",
     );
+  });
+});
+
+describe("evidenceStatsHref", () => {
+  it("links a line that has a stats metric and evidence numbers", () => {
+    expect(
+      evidenceStatsHref("2026-11-10", {
+        statsMetric: "COLD",
+        evidenceNumbers: [30, 12],
+      }),
+    ).toBe("/numbers?date=2026-11-10&metric=COLD&highlight=30%2C12");
+  });
+
+  it("gives no link for a line without a stats metric", () => {
+    expect(
+      evidenceStatsHref("2026-11-10", {
+        statsMetric: null,
+        evidenceNumbers: [],
+      }),
+    ).toBeNull();
+  });
+
+  it("gives no link when the line has no evidence numbers", () => {
+    expect(
+      evidenceStatsHref("2026-11-10", {
+        statsMetric: "RECENT",
+        evidenceNumbers: [],
+      }),
+    ).toBeNull();
   });
 });
 

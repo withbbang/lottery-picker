@@ -5,7 +5,12 @@ import { useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
+import { evidenceStatsHref } from "@/lib/number-stats-link";
 import { LottoBall } from "@/components/lotto/LottoBall";
+import {
+  EvidenceButton,
+  EvidencePanel,
+} from "@/components/recommendation/EvidencePanel";
 import type {
   RecommendationSetResponse,
   StrategyType,
@@ -109,12 +114,15 @@ export function RecommendationCard() {
         {strategyLines.map((line, index) => (
           <SlipLine
             key={`${line.strategy}-${index}`}
+            date={data.date}
             letter={gameLetter(index)}
             line={line}
           />
         ))}
       </div>
-      {combinedLines.length > 0 && <CombinedSlip lines={combinedLines} />}
+      {combinedLines.length > 0 && (
+        <CombinedSlip date={data.date} lines={combinedLines} />
+      )}
       <div className="flex flex-col gap-1 text-sm">
         <p className="text-muted tabular-nums">
           분석 범위: {data.historyFromRound}~{data.historyToRound}회
@@ -126,7 +134,7 @@ export function RecommendationCard() {
 }
 
 /** 근거 조합은 용지 한 장을 따로 쓴다. 설명은 머리에 한 번만 둔다. */
-function CombinedSlip({ lines }: { lines: Line[] }) {
+function CombinedSlip({ date, lines }: { date: string; lines: Line[] }) {
   const titleId = useId();
   return (
     <section
@@ -144,6 +152,7 @@ function CombinedSlip({ lines }: { lines: Line[] }) {
       {lines.map((line, index) => (
         <SlipLine
           key={`${line.strategy}-${index}`}
+          date={date}
           letter={gameLetter(index)}
           line={line}
           title={`${STRATEGY_LABELS.COMBINED} ${index + 1}`}
@@ -154,10 +163,13 @@ function CombinedSlip({ lines }: { lines: Line[] }) {
 }
 
 function SlipLine({
+  date,
   letter,
   line,
   title,
 }: {
+  /** 이 추천의 날짜. 근거 통계 링크의 기준이다. */
+  date: string;
   letter: string;
   line: Line;
   /** 근거 조합처럼 같은 전략이 여러 줄이면 "근거 조합 1"처럼 따로 붙인다. 설명은 용지 머리에 있어 생략한다. */
@@ -187,21 +199,11 @@ function SlipLine({
           </>
         )}
       </h2>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={evidenceId}
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-1 rounded-md border border-rule px-2 py-1 text-xs font-medium text-muted hover:border-ink/40 hover:text-ink aria-expanded:border-slip/40 aria-expanded:text-slip"
-      >
-        근거
-        <span
-          aria-hidden="true"
-          className={`transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
-        >
-          ▾
-        </span>
-      </button>
+      <EvidenceButton
+        open={open}
+        controls={evidenceId}
+        onToggle={() => setOpen((value) => !value)}
+      />
       {/* 공 줄과 근거 상자는 칸 이름 열부터 용지 안쪽 폭을 다 쓴다(최근 당첨번호와 같은 배치). */}
       <div className="col-span-full flex flex-col gap-2.5">
         <div className="flex w-full items-center justify-between">
@@ -209,15 +211,12 @@ function SlipLine({
             <LottoBall key={n} value={n} />
           ))}
         </div>
-        <ul
+        <EvidencePanel
           id={evidenceId}
-          hidden={!open}
-          className="flex w-full flex-col gap-1 rounded-md bg-paper px-3 py-2 text-sm text-muted"
-        >
-          {line.evidence.map((text, i) => (
-            <li key={i}>{text}</li>
-          ))}
-        </ul>
+          open={open}
+          evidence={line.evidence}
+          statsHref={evidenceStatsHref(date, line)}
+        />
       </div>
     </article>
   );

@@ -218,6 +218,8 @@ describe("RecommendationCard", () => {
           "7(최근 빈도) · 12(장기 미출현) · 24·39(번호 쌍) · 37(전체 빈도) · 40(최근 빈도·전체 빈도)",
         ],
         relaxation: "NONE" as const,
+        evidenceNumbers: [],
+        statsMetric: null,
       },
       {
         strategy: "COMBINED" as const,
@@ -226,6 +228,8 @@ describe("RecommendationCard", () => {
           "7(최근 빈도) · 12(장기 미출현) · 24·39(번호 쌍) · 29(장기 미출현) · 37(전체 빈도)",
         ],
         relaxation: "NONE" as const,
+        evidenceNumbers: [],
+        statsMetric: null,
       },
     ];
     fetchMock.mockResolvedValue(
@@ -378,6 +382,49 @@ describe("RecommendationCard", () => {
         "텔레그램 알림을 보내지 못했습니다. 번호는 여기서 확인하세요.",
       ),
     ).not.toBeInTheDocument();
+  });
+
+  it("links recent-hot evidence to the number statistics of that day", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: set })),
+    );
+    renderCard();
+    const lines = await screen.findAllByRole("article");
+
+    // when
+    await userEvent.click(
+      within(lines[0]).getByRole("button", { name: /근거/ }),
+    );
+
+    // then
+    expect(
+      within(lines[0]).getByRole("link", { name: "통계에서 보기" }),
+    ).toHaveAttribute(
+      "href",
+      "/numbers?date=2026-11-06&metric=RECENT&highlight=8",
+    );
+  });
+
+  it("shows no stats link for pair and balanced lines", async () => {
+    // given
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: set })),
+    );
+
+    // when
+    renderCard();
+    const lines = await screen.findAllByRole("article");
+
+    // then
+    for (const line of [lines[3], lines[4]]) {
+      expect(
+        within(line).queryByRole("link", {
+          name: "통계에서 보기",
+          hidden: true,
+        }),
+      ).not.toBeInTheDocument();
+    }
   });
 
   it("shows an empty message on 204", async () => {
