@@ -100,9 +100,9 @@ export function RoundResults({ round }: { round: number }) {
           </span>
         </h3>
         <ul className="flex flex-col text-sm tabular-nums">
-          {data.lines.map((line) => (
+          {data.lines.map((line, index) => (
             <li
-              key={`${line.date}-${line.strategy}`}
+              key={`${line.date}-${line.strategy}-${index}`}
               className="flex flex-col gap-1.5 border-t border-rule py-2.5"
             >
               <p className="flex justify-between">

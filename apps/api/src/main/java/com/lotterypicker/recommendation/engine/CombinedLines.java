@@ -20,7 +20,7 @@ public final class CombinedLines {
 
 	public static final int MAX_LINES = 5;
 
-	/** 근거 순위 0이 2점, 1이 1점. 쌍은 번호마다 점수를 받는다. */
+	/** 근거 순위 0이 2점, 1이 1점. 묶음은 고정 번호 밖에서 새로 더하는 번호마다 점수를 받는다. */
 	private static final int TOP_SCORE = 2;
 
 	private static final String FIXED_LABEL = "고정";
@@ -52,7 +52,7 @@ public final class CombinedLines {
 	 */
 	public static List<DrawnLine> combine(List<DrawnLine> sources, Set<Integer> fixed,
 			Predicate<LottoNumbers> rejected) {
-		List<Bundle> bundles = bundles(sources);
+		List<Bundle> bundles = bundles(sources, fixed);
 		List<Candidate> candidates = candidates(bundles, fixed).stream()
 			.filter(candidate -> !rejected.test(new LottoNumbers(candidate.numbers())))
 			.toList();
@@ -74,11 +74,15 @@ public final class CombinedLines {
 			.toList();
 	}
 
-	private static List<Bundle> bundles(List<DrawnLine> sources) {
+	private static List<Bundle> bundles(List<DrawnLine> sources, Set<Integer> fixed) {
 		Map<List<Integer>, Bundle> byNumbers = new LinkedHashMap<>();
 		for (DrawnLine line : sources) {
 			for (Ingredient ingredient : line.ingredients()) {
-				int score = (TOP_SCORE - ingredient.rank()) * ingredient.numbers().size();
+				long added = ingredient.numbers().stream().filter(n -> !fixed.contains(n)).count();
+				if (added == 0) {
+					continue; // 고정 번호만으로 된 묶음은 줄에 아무것도 더하지 않는다
+				}
+				int score = (TOP_SCORE - ingredient.rank()) * (int) added;
 				byNumbers.merge(ingredient.numbers(),
 						new Bundle(ingredient.numbers(), score, List.of(line.strategy())),
 						(a, b) -> new Bundle(a.numbers(), a.score() + b.score(), merged(a.sources(), b.sources())));
@@ -142,7 +146,10 @@ public final class CombinedLines {
 		record Part(int first, String text) {
 		}
 		List<Part> parts = new ArrayList<>();
-		fixed.forEach(number -> parts.add(new Part(number, number + "(" + FIXED_LABEL + ")")));
+		// 쌍 묶음에 이미 적힌 고정 번호는 따로 적지 않는다
+		fixed.stream()
+			.filter(number -> candidate.bundles().stream().noneMatch(b -> b.numbers().contains(number)))
+			.forEach(number -> parts.add(new Part(number, number + "(" + FIXED_LABEL + ")")));
 		candidate.bundles().forEach(bundle -> parts.add(new Part(bundle.numbers().get(0), bundle.text())));
 		return parts.stream()
 			.sorted(Comparator.comparingInt(Part::first))

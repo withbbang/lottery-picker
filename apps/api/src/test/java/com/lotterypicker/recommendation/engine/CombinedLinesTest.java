@@ -196,4 +196,35 @@ class CombinedLinesTest {
 		assertThat(numbers).doesNotHaveDuplicates();
 	}
 
+	/** 고정 1과 쌍 1·45가 1을 공유한다. 단독 1순위 5개(각 2점). */
+	private static List<DrawnLine> pairWithFixedPartner() {
+		return List.of(source(StrategyType.RECENT_HOT, single(10, 0), single(20, 0)),
+				source(StrategyType.LONG_COLD, single(30, 0), single(40, 0)),
+				source(StrategyType.ALL_TIME, single(33, 0)),
+				source(StrategyType.PAIR, new Ingredient(List.of(1, 45), 0)), source(StrategyType.BALANCED));
+	}
+
+	@Test
+	void 고정_번호와_겹치는_쌍은_새로_더하는_번호만큼만_점수를_받는다() {
+		// when: 쌍이 더하는 번호는 45 하나라 단독과 같은 2점, 동점이면 사전순
+		List<DrawnLine> lines = CombinedLines.combine(pairWithFixedPartner(), Set.of(1), NONE_REJECTED);
+
+		// then
+		assertThat(lines.get(0).numbers().values()).containsExactly(1, 10, 20, 30, 33, 40);
+	}
+
+	@Test
+	void 쌍에_들어간_고정_번호는_근거에_두_번_적지_않는다() {
+		// when
+		List<DrawnLine> lines = CombinedLines.combine(pairWithFixedPartner(), Set.of(1), NONE_REJECTED);
+
+		// then
+		assertThat(lines).filteredOn(line -> line.numbers().contains(45))
+			.isNotEmpty()
+			.allSatisfy(line -> assertThat(line.evidence().get(0)).startsWith("1·45(번호 쌍)")
+				.doesNotContain("1(고정)"));
+		assertThat(lines).filteredOn(line -> !line.numbers().contains(45))
+			.allSatisfy(line -> assertThat(line.evidence().get(0)).startsWith("1(고정)"));
+	}
+
 }

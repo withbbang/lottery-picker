@@ -150,4 +150,34 @@ describe("RoundResults", () => {
       screen.queryByText("이 회차에는 추천한 번호가 없습니다."),
     ).not.toBeInTheDocument();
   });
+
+  it("lists every combined line of the same day", async () => {
+    // given: 근거 조합은 하루에 여러 줄이다
+    const combined = (numbers: number[]) => ({
+      date: "2026-11-01",
+      strategy: "COMBINED" as const,
+      numbers,
+      matchCount: 0,
+      prizeRank: "NONE" as const,
+      prizeAmount: 0,
+    });
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // when
+    renderResults({
+      ...scored,
+      lines: [
+        ...scored.lines,
+        combined([5, 6, 7, 8, 9, 10]),
+        combined([11, 12, 13, 14, 15, 16]),
+      ],
+    });
+
+    // then
+    expect(await screen.findAllByText(/근거 조합/)).toHaveLength(2);
+    expect(
+      errors.mock.calls.some((call) => String(call[0]).includes("same key")),
+    ).toBe(false);
+    errors.mockRestore();
+  });
 });
