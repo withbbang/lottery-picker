@@ -4,6 +4,7 @@ import com.lotterypicker.lotto.LottoNumbers;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,16 +103,22 @@ public final class CombinedLines {
 		Map<List<Integer>, Candidate> byNumbers = new LinkedHashMap<>();
 		for (int mask = 1; mask < (1 << bundles.size()); mask++) {
 			TreeSet<Integer> union = new TreeSet<>(fixed);
+			Set<Integer> used = new HashSet<>();
+			boolean overlapping = false;
 			int score = 0;
 			List<Bundle> picked = new ArrayList<>();
 			for (int i = 0; i < bundles.size(); i++) {
 				if ((mask & (1 << i)) != 0) {
+					// 번호를 공유하는 묶음끼리는 같이 고르지 않는다(점수 이중 계산·근거 중복 방지)
+					for (int number : bundles.get(i).numbers()) {
+						overlapping |= !used.add(number);
+					}
 					union.addAll(bundles.get(i).numbers());
 					score += bundles.get(i).score();
 					picked.add(bundles.get(i));
 				}
 			}
-			if (union.size() != LottoNumbers.SIZE) {
+			if (overlapping || union.size() != LottoNumbers.SIZE) {
 				continue;
 			}
 			List<Integer> numbers = List.copyOf(union);

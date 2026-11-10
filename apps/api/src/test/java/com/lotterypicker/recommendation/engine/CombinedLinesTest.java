@@ -227,4 +227,20 @@ class CombinedLinesTest {
 			.allSatisfy(line -> assertThat(line.evidence().get(0)).startsWith("1(고정)"));
 	}
 
+	@Test
+	void 번호가_겹치는_묶음은_한_줄에_같이_고르지_않는다() {
+		// given: 단독 5(최근 빈도)와 쌍 5·15(번호 쌍)가 5를 공유한다
+		List<DrawnLine> sources = List.of(source(StrategyType.RECENT_HOT, single(5, 0), single(20, 1)),
+				source(StrategyType.LONG_COLD, single(30, 0), single(40, 1)),
+				source(StrategyType.ALL_TIME, single(33, 0), single(44, 1)),
+				source(StrategyType.PAIR, new Ingredient(List.of(5, 15), 0)), source(StrategyType.BALANCED));
+
+		// when
+		List<DrawnLine> lines = CombinedLines.combine(sources, Set.of(), NONE_REJECTED);
+
+		// then: 근거에 5가 두 번 적히지 않는다
+		assertThat(lines).isNotEmpty()
+			.allSatisfy(line -> assertThat(line.evidence().get(0)).doesNotContain("5(최근 빈도) · 5·15"));
+	}
+
 }
