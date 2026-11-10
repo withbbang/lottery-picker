@@ -15,3 +15,4 @@ paths:
 - 트랜잭션: Service 클래스에 `@Transactional(readOnly = true)`, 쓰기 메서드만 `@Transactional`.
 - 테스트: Service는 Mockito 단위 테스트, Controller는 `@WebMvcTest`, Repository는 `@DataJpaTest`. `@SpringBootTest`는 꼭 필요할 때만.
 - 난수: `java.security.SecureRandom` 을 빈으로 등록해 주입. `new Random()` 직접 생성 금지 → 테스트에서 시드 고정 불가.
+- Flyway 자바 마이그레이션(`db/migration/V*__*.java`)은 앱 코드(파싱·형식·통계)에 기대지 않고 로직을 자체에 고정한다. 적용된 마이그레이션은 고치지 말고 새 버전을 만든다.
