@@ -19,8 +19,7 @@
       "Read(./apps/**/.env.development)",
       "Read(./apps/**/.env.production)",
       "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
-      "Bash(rm -rf:*)"
+      "Bash(git push -f:*)"
     ]
   },
   "hooks": {
