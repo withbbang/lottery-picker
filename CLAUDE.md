@@ -14,7 +14,7 @@
 
 ```bash
 # apps/web
-pnpm dev        # 개발 서버
+API_INTERNAL_URL=http://localhost:8080 pnpm dev   # 개발 서버 (이 변수 없으면 바로 종료)
 pnpm lint       # ESLint + Prettier 서식 검사
 pnpm format     # Prettier로 서식 정리 (.prettierrc.json)
 pnpm test       # Vitest (watch 아님, vitest run)
@@ -30,6 +30,7 @@ SPRING_PROFILES_ACTIVE=local SCHEDULING_ENABLED=false SPRING_DATASOURCE_URL="jdb
 
 ## 항상 지킬 것
 
+- 응답은 한국어로. `/code-review`·`/claude-md-management:*` 등 스킬·서브에이전트 결과도 한국어로 작성하고, 영어로 받은 결과는 한국어로 옮겨 보고한다.
 - 패키지 매니저는 **pnpm**. npm / yarn 명령 쓰지 않는다.
 - 브랜치: `master`(배포용) · `dev` · 피처 브랜치. 피처 브랜치는 항상 `dev`에서 딴다. 피처 브랜치는 PR하지 않고 로컬에서 머지만 한다. origin에 푸시하는 건 `dev`, `master`만.
 - 병합·푸시(요청 시): 피처 → `dev` → `master` 순서로 병합, `git push origin dev master`, 끝나면 로컬 피처 브랜치 삭제. fast-forward가 안 되면 `-m "Merge : <기능명> → dev"`로 병합한다 (기본 메시지는 `commit-msg` 훅이 거부, 제목 50자 이내).
