@@ -114,6 +114,7 @@ class RecommendationControllerTest {
 			.lineIndex(lineIndex)
 			.numbers(new LottoNumbers(List.of(3, 11, 19, 27, 38, 44)))
 			.evidence(List.of("번호 3: 최근 50회 중 11회 출현"))
+			.evidenceNumbers(List.of(3))
 			.relaxation(Relaxation.NONE)
 			.fixedSnapshot("")
 			.excludedSnapshot("")
@@ -287,6 +288,22 @@ class RecommendationControllerTest {
 
 		// then
 		result.andExpect(status().isNoContent()).andExpect(content().string(""));
+	}
+
+	@Test
+	void 줄마다_근거_번호와_통계_지표를_담는다() throws Exception {
+		// given
+		given(repository.findByDateOrderByLineIndexAsc(TODAY)).willReturn(storedSet(TODAY));
+
+		// when
+		var result = mockMvc.perform(get("/api/v1/recommendations").param("date", "2026-11-06"));
+
+		// then
+		result.andExpect(jsonPath("$.data.lines[0].strategy").value("RECENT_HOT"))
+			.andExpect(jsonPath("$.data.lines[0].evidenceNumbers[0]").value(3))
+			.andExpect(jsonPath("$.data.lines[0].statsMetric").value("RECENT"))
+			.andExpect(jsonPath("$.data.lines[3].strategy").value("PAIR"))
+			.andExpect(jsonPath("$.data.lines[3].statsMetric").doesNotExist());
 	}
 
 	@Test

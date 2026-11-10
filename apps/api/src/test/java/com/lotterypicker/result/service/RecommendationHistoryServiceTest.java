@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import com.lotterypicker.lotto.LottoNumbers;
 import com.lotterypicker.lotto.PrizeRank;
+import com.lotterypicker.recommendation.engine.NumberMetric;
 import com.lotterypicker.recommendation.engine.Relaxation;
 import com.lotterypicker.recommendation.engine.StrategyType;
 import com.lotterypicker.recommendation.entity.DailyRecommendation;
@@ -123,6 +124,41 @@ class RecommendationHistoryServiceTest {
 				RecommendationHistoryLineResponse::matchCount, RecommendationHistoryLineResponse::prizeRank)
 			.containsExactly(tuple(StrategyType.RECENT_HOT, 4, PrizeRank.FOURTH),
 					tuple(StrategyType.COMBINED, 0, PrizeRank.NONE));
+	}
+
+	@Test
+	void 지난_줄에도_근거_번호와_통계_지표를_담는다() {
+		// given
+		DailyRecommendation recent = DailyRecommendation.builder()
+			.date(NOV_7)
+			.roundNo(1249)
+			.strategy(StrategyType.RECENT_HOT)
+			.lineIndex(0)
+			.numbers(new LottoNumbers(List.of(1, 2, 3, 4, 30, 45)))
+			.evidence(List.of("번호 30: 최근 50회 중 9회 출현"))
+			.evidenceNumbers(List.of(30))
+			.relaxation(Relaxation.NONE)
+			.fixedSnapshot("")
+			.excludedSnapshot("")
+			.historyFromRound(1)
+			.historyToRound(1248)
+			.createdAt(NOV_7.atTime(17, 0))
+			.build();
+		ReflectionTestUtils.setField(recent, "id", 1L);
+		given(recommendations.findRecommendationDates(PageRequest.of(0, 10)))
+			.willReturn(new PageImpl<>(List.of(NOV_7), PageRequest.of(0, 10), 1));
+		given(recommendations.findByDateInAndControlFalseOrderByDateDescLineIndexAsc(List.of(NOV_7)))
+			.willReturn(List.of(recent, line(2, NOV_7, 1249, StrategyType.PAIR, 3)));
+		given(results.findByRecommendationIdIn(List.of(1L, 2L))).willReturn(List.of());
+
+		// when
+		var lines = service.history(0, 10).items().get(0).lines();
+
+		// then
+		assertThat(lines.get(0).evidenceNumbers()).containsExactly(30);
+		assertThat(lines.get(0).statsMetric()).isEqualTo(NumberMetric.RECENT);
+		assertThat(lines.get(1).evidenceNumbers()).isEmpty();
+		assertThat(lines.get(1).statsMetric()).isNull();
 	}
 
 	@Test

@@ -2,6 +2,7 @@ package com.lotterypicker.result.service;
 
 import com.lotterypicker.common.PageResponse;
 import com.lotterypicker.lotto.LottoNumbers;
+import com.lotterypicker.recommendation.engine.NumberMetric;
 import com.lotterypicker.recommendation.entity.DailyRecommendation;
 import com.lotterypicker.recommendation.repository.DailyRecommendationRepository;
 import com.lotterypicker.result.dto.RecommendationHistoryLineResponse;
@@ -71,14 +72,15 @@ public class RecommendationHistoryService {
 	private static RecommendationHistoryLineResponse toLine(DailyRecommendation line, RecommendationResult result,
 			LottoRound winning) {
 		LottoNumbers numbers = line.numbers();
+		NumberMetric metric = NumberMetric.forStrategy(line.getStrategy()).orElse(null);
 		if (result == null || winning == null) {
 			return new RecommendationHistoryLineResponse(line.getStrategy(), numbers.values(), line.getEvidence(),
-					line.getRelaxation(), null, null, null, null);
+					line.getRelaxation(), line.getEvidenceNumbers(), metric, null, null, null, null);
 		}
 		LottoNumbers drawn = winning.numbers();
 		Integer bonus = numbers.contains(winning.getBonus()) ? winning.getBonus() : null;
 		return new RecommendationHistoryLineResponse(line.getStrategy(), numbers.values(), line.getEvidence(),
-				line.getRelaxation(), result.getMatchCount(), result.getPrizeRank(),
+				line.getRelaxation(), line.getEvidenceNumbers(), metric, result.getMatchCount(), result.getPrizeRank(),
 				numbers.values().stream().filter(drawn::contains).toList(), bonus);
 	}
 

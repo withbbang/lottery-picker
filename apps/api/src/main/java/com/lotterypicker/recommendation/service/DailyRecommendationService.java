@@ -6,6 +6,7 @@ import com.lotterypicker.common.config.ClockConfig;
 import com.lotterypicker.notification.NotificationKind;
 import com.lotterypicker.notification.service.NotificationService;
 import com.lotterypicker.recommendation.CatchUpPolicy;
+import com.lotterypicker.recommendation.EvidenceNumbers;
 import com.lotterypicker.recommendation.RecommendationSet;
 import com.lotterypicker.recommendation.RoundCalendar;
 import com.lotterypicker.recommendation.StoredLine;
@@ -196,6 +197,7 @@ public class DailyRecommendationService {
 			.lineIndex(lineIndex)
 			.numbers(line.numbers())
 			.evidence(line.evidence())
+			.evidenceNumbers(EvidenceNumbers.of(line))
 			.relaxation(relaxation)
 			.build();
 	}

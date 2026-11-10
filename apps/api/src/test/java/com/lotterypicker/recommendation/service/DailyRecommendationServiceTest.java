@@ -152,6 +152,34 @@ class DailyRecommendationServiceTest {
 	}
 
 	@Test
+	void 통계_지표가_있는_전략_줄은_근거_문구의_번호를_근거_번호로_저장한다() {
+		// when
+		service.generateIfAbsent(DATE);
+
+		// then: 근거 문구 "번호 N: …"의 N과 같은 번호를 같은 순서로
+		List<StrategyType> withMetric = List.of(StrategyType.RECENT_HOT, StrategyType.LONG_COLD, StrategyType.ALL_TIME);
+		assertThat(db).filteredOn(line -> withMetric.contains(line.getStrategy())).hasSize(3).allSatisfy(line -> {
+			List<Integer> fromText = line.getEvidence().stream()
+				.filter(text -> text.startsWith("번호 "))
+				.map(text -> Integer.parseInt(text.substring(3, text.indexOf(':'))))
+				.toList();
+			assertThat(line.getEvidenceNumbers()).isNotEmpty().isEqualTo(fromText);
+		});
+	}
+
+	@Test
+	void 통계_지표가_없는_줄은_근거_번호가_비어_있다() {
+		// when
+		service.generateIfAbsent(DATE);
+
+		// then
+		List<StrategyType> withMetric = List.of(StrategyType.RECENT_HOT, StrategyType.LONG_COLD, StrategyType.ALL_TIME);
+		assertThat(db).filteredOn(line -> !withMetric.contains(line.getStrategy()))
+			.isNotEmpty()
+			.allSatisfy(line -> assertThat(line.getEvidenceNumbers()).isEmpty());
+	}
+
+	@Test
 	void 근거_조합_줄은_line_index_5부터_저장한다() {
 		// when
 		Optional<RecommendationSet> result = service.generateIfAbsent(DATE);

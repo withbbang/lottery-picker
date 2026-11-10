@@ -56,6 +56,11 @@ public class DailyRecommendation {
 	@Column(columnDefinition = "TEXT")
 	private List<String> evidence;
 
+	/** 근거 문구에 적힌 번호. 통계 지표가 있는 전략에만 있고, 나머지는 빈 목록. */
+	@Convert(converter = EvidenceNumbersConverter.class)
+	@Column(name = "evidence_numbers")
+	private List<Integer> evidenceNumbers;
+
 	@Enumerated(EnumType.STRING)
 	private Relaxation relaxation;
 
@@ -79,8 +84,8 @@ public class DailyRecommendation {
 
 	@Builder
 	private DailyRecommendation(LocalDate date, int roundNo, StrategyType strategy, int lineIndex, LottoNumbers numbers,
-			List<String> evidence, Relaxation relaxation, String fixedSnapshot, String excludedSnapshot,
-			int historyFromRound, int historyToRound, LocalDateTime createdAt) {
+			List<String> evidence, List<Integer> evidenceNumbers, Relaxation relaxation, String fixedSnapshot,
+			String excludedSnapshot, int historyFromRound, int historyToRound, LocalDateTime createdAt) {
 		this.date = date;
 		this.roundNo = roundNo;
 		this.strategy = strategy;
@@ -93,6 +98,7 @@ public class DailyRecommendation {
 		this.n5 = v.get(4);
 		this.n6 = v.get(5);
 		this.evidence = List.copyOf(evidence);
+		this.evidenceNumbers = evidenceNumbers == null ? List.of() : List.copyOf(evidenceNumbers);
 		this.relaxation = relaxation;
 		this.fixedSnapshot = fixedSnapshot;
 		this.excludedSnapshot = excludedSnapshot;
