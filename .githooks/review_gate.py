@@ -65,3 +65,28 @@ def describe_size(changed):
         return "알 수 없음"
     total = sum(lines for lines, path in changed if not is_doc(path) and os.path.basename(path) not in LOCKFILES)
     return f"코드 {total}줄(문서·lockfile 제외)"
+
+
+def unverified_commits(base, new):
+    """base..new 중 리뷰 기록에 닿지 않고 문서만 바꾸지도 않은 커밋. 확인할 수 없으면 [new].
+
+    리뷰한 커밋 위에 문서 커밋을 얹은 경우처럼, 리뷰 기록 이후 커밋이 모두 문서만 바꾸면 빈 목록이다.
+    이미 검증된 커밋만 병합한 병합 커밋은 허용한다.
+    """
+    excluded = [f"^{sha}" for sha in reviewed_shas() if resolve(sha)]
+    if base and resolve(base):
+        excluded.append(f"^{base}")
+    listed = git("rev-list", new, *excluded)
+    if listed is None:
+        return [new]
+    pending = listed.split()
+    bad = []
+    for commit in pending:
+        commit_parents = parents(commit)
+        if not commit_parents:
+            bad.append(commit)
+        elif len(commit_parents) > 1 and not set(commit_parents[1:]) & set(pending):
+            continue
+        elif not docs_only(changes(commit_parents[0], commit)):
+            bad.append(commit)
+    return bad

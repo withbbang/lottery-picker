@@ -15,38 +15,14 @@ from review_gate import (  # noqa: E402
     REVIEW_ADVICE,
     changes,
     describe_size,
-    docs_only,
-    git,
     is_ancestor,
-    parents,
     resolve,
-    reviewed_shas,
+    unverified_commits,
 )
 
 DEV = "refs/heads/dev"
 MASTER = "refs/heads/master"
 ORIGIN_DEV = "refs/remotes/origin/dev"
-
-
-def unverified_commits(remote, new):
-    """리뷰 기록과 원격 어디에서도 닿지 않는 커밋 중 허용되지 않는 것."""
-    excluded = [f"^{sha}" for sha in reviewed_shas() if resolve(sha)]
-    if remote and resolve(remote):
-        excluded.append(f"^{remote}")
-    listed = git("rev-list", new, *excluded)
-    if listed is None:
-        return [new]  # 확인할 수 없으면 막는다.
-    pending = listed.split()
-    bad = []
-    for commit in pending:
-        commit_parents = parents(commit)
-        if not commit_parents:
-            bad.append(commit)
-        elif len(commit_parents) > 1 and not set(commit_parents[1:]) & set(pending):
-            continue
-        elif not docs_only(changes(commit_parents[0], commit)):
-            bad.append(commit)
-    return bad
 
 
 def main():
