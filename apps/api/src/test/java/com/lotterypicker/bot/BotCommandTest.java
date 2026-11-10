@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.lotterypicker.bot.BotCommand.Parsed;
 import com.lotterypicker.bot.dto.BotMenuItem;
+import com.lotterypicker.notification.TelegramChat;
 import org.junit.jupiter.api.Test;
 
 class BotCommandTest {
@@ -46,9 +47,24 @@ class BotCommandTest {
 	@Test
 	void 메뉴는_표_순서다() {
 		// given / when / then
-		assertThat(BotCommand.menu()).extracting(BotMenuItem::command)
+		assertThat(BotCommand.menu(TelegramChat.OWNER)).extracting(BotMenuItem::command)
 			.containsExactly("today", "result", "performance", "round", "stats", "settings", "help");
-		assertThat(BotCommand.menu().get(0).description()).isEqualTo("오늘 추천");
+		assertThat(BotCommand.menu(TelegramChat.OWNER).get(0).description()).isEqualTo("오늘 추천");
+	}
+
+	@Test
+	void 가족방_메뉴에는_설정_보기가_없다() {
+		// given / when / then
+		assertThat(BotCommand.menu(TelegramChat.FAMILY)).extracting(BotMenuItem::command)
+			.containsExactly("today", "result", "performance", "round", "stats", "help");
+	}
+
+	@Test
+	void 설정_보기만_운영자_방_전용이다() {
+		// given / when / then
+		assertThat(BotCommand.SETTINGS.availableIn(TelegramChat.FAMILY)).isFalse();
+		assertThat(BotCommand.SETTINGS.availableIn(TelegramChat.OWNER)).isTrue();
+		assertThat(BotCommand.TODAY.availableIn(TelegramChat.FAMILY)).isTrue();
 	}
 
 }

@@ -1,7 +1,9 @@
 package com.lotterypicker.result.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -13,6 +15,7 @@ import static org.mockito.Mockito.when;
 
 import com.lotterypicker.lotto.LottoNumbers;
 import com.lotterypicker.lotto.PrizeRank;
+import com.lotterypicker.notification.TelegramChat;
 import com.lotterypicker.notification.TelegramClient;
 import com.lotterypicker.notification.TelegramException;
 import com.lotterypicker.notification.repository.NotificationLogRepository;
@@ -135,7 +138,7 @@ class PostDrawServiceTest {
 
 	private String sentText() {
 		ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
-		verify(telegram).send(text.capture());
+		verify(telegram).send(any(), text.capture());
 		return text.getValue();
 	}
 
@@ -178,7 +181,7 @@ class PostDrawServiceTest {
 
 		// then
 		assertThat(results.findByRoundNo(1249)).hasSize(70);
-		verify(telegram, times(1)).send(anyString());
+		verify(telegram, times(1)).send(any(), anyString());
 	}
 
 	@Test
@@ -219,7 +222,7 @@ class PostDrawServiceTest {
 		serviceOn("2026-11-07T20:45").process(1200);
 
 		// then
-		verify(telegram, never()).send(anyString());
+		verify(telegram, never()).send(any(), anyString());
 		assertThat(results.findByRoundNo(1200)).isEmpty();
 	}
 
@@ -270,7 +273,7 @@ class PostDrawServiceTest {
 		PostDrawService service = serviceOn("2026-11-07T20:45");
 		doThrow(new TelegramException("down"), new TelegramException("down"), new TelegramException("down"))
 			.doNothing()
-			.when(telegram).send(anyString());
+			.when(telegram).send(any(), anyString());
 		service.process(1249);
 
 		// when: 다음 확인 두 번
@@ -278,7 +281,7 @@ class PostDrawServiceTest {
 		service.resendUnsent();
 
 		// then: 실패 3회 + 성공 1회. 보낸 뒤에는 다시 보내지 않는다
-		verify(telegram, times(4)).send(anyString());
+		verify(telegram, times(4)).send(any(), anyString());
 		assertThat(results.findByRoundNo(1249)).hasSize(70);
 	}
 
@@ -297,6 +300,24 @@ class PostDrawServiceTest {
 	}
 
 	@Test
+	void 가족방에만_못_보냈으면_재발송에서_가족방에만_보낸다() {
+		// given: 운영자 방에는 보냈지만 가족방 발송은 모두 실패했다
+		when(telegram.hasFamilyChat()).thenReturn(true);
+		rounds.save(round(1249, DRAW_DATE, LocalDateTime.of(2026, 11, 7, 20, 45)));
+		saveWeek(1249, DRAW_DATE);
+		doThrow(new TelegramException("down")).when(telegram).send(eq(TelegramChat.FAMILY), anyString());
+		serviceOn("2026-11-07T20:45").process(1249);
+		doNothing().when(telegram).send(eq(TelegramChat.FAMILY), anyString());
+
+		// when
+		serviceOn("2026-11-07T21:00").resendUnsent();
+
+		// then
+		verify(telegram, times(1)).send(eq(TelegramChat.OWNER), anyString());
+		verify(telegram, times(4)).send(eq(TelegramChat.FAMILY), anyString());
+	}
+
+	@Test
 	void 재발송은_최신_회차와_직전_회차만_본다() {
 		// given: 추천이 있는 오래된 회차는 대상이 아니다
 		rounds.save(round(1247, LocalDate.of(2026, 10, 24), LocalDateTime.of(2026, 10, 24, 20, 45)));
@@ -308,7 +329,7 @@ class PostDrawServiceTest {
 		serviceOn("2026-11-07T21:00").resendUnsent();
 
 		// then: 1249(7일 내)과 1248(경계 7일)만 알리고 1247은 건드리지 않는다
-		verify(telegram, times(2)).send(anyString());
+		verify(telegram, times(2)).send(any(), anyString());
 		assertThat(results.findByRoundNo(1247)).isEmpty();
 	}
 
@@ -317,15 +338,15 @@ class PostDrawServiceTest {
 		// given: 10/31 추첨 당일 발송이 3회 모두 실패했다
 		rounds.save(round(1248, LocalDate.of(2026, 10, 31), LocalDateTime.of(2026, 10, 31, 20, 45)));
 		saveWeek(1248, LocalDate.of(2026, 10, 31));
-		doThrow(new TelegramException("down")).when(telegram).send(anyString());
+		doThrow(new TelegramException("down")).when(telegram).send(any(), anyString());
 		serviceOn("2026-10-31T20:45").process(1248);
-		doNothing().when(telegram).send(anyString());
+		doNothing().when(telegram).send(any(), anyString());
 
 		// when: 8일 뒤(새 회차 추첨 다음 날)에 텔레그램이 복구됐다
 		serviceOn("2026-11-08T10:00").resendUnsent();
 
 		// then: 지난주 회차를 새 소식처럼 보내지 않는다
-		verify(telegram, times(3)).send(anyString());
+		verify(telegram, times(3)).send(any(), anyString());
 	}
 
 	@Test
@@ -395,7 +416,7 @@ class PostDrawServiceTest {
 			assertThat(s.tally().lineCount()).isEqualTo(35);
 			assertThat(s.tally().bestRank()).isEqualTo(PrizeRank.FOURTH);
 		});
-		verify(telegram, never()).send(anyString());
+		verify(telegram, never()).send(any(), anyString());
 	}
 
 	@Test

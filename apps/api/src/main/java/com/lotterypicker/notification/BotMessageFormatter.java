@@ -29,8 +29,8 @@ public final class BotMessageFormatter {
 	private BotMessageFormatter() {
 	}
 
-	public static String help() {
-		return "사용할 수 있는 명령\n" + BotCommand.menu()
+	public static String help(TelegramChat chat) {
+		return "사용할 수 있는 명령\n" + BotCommand.menu(chat)
 			.stream()
 			.map(item -> "/" + item.command() + " " + item.description())
 			.collect(Collectors.joining("\n"));

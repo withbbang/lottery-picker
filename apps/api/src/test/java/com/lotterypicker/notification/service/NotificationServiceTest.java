@@ -3,6 +3,7 @@ package com.lotterypicker.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.when;
 
 import com.lotterypicker.notification.NotificationKind;
 import com.lotterypicker.notification.NotificationStatus;
+import com.lotterypicker.notification.TelegramChat;
 import com.lotterypicker.notification.TelegramClient;
 import com.lotterypicker.notification.TelegramException;
 import com.lotterypicker.notification.entity.NotificationLog;
@@ -66,7 +68,7 @@ class NotificationServiceTest {
 		doAnswer(inv -> {
 			atSend.set(service.statusOf(KIND, key));
 			return null;
-		}).when(telegram).send("본문");
+		}).when(telegram).send(TelegramChat.OWNER, "본문");
 
 		// when
 		NotificationStatus result = service.sendOnce(KIND, key, "본문");
@@ -87,7 +89,7 @@ class NotificationServiceTest {
 
 		// then
 		assertThat(second).isEqualTo(NotificationStatus.SENT);
-		verify(telegram, times(1)).send(anyString());
+		verify(telegram, times(1)).send(any(), anyString());
 	}
 
 	@Test
@@ -99,13 +101,13 @@ class NotificationServiceTest {
 		service.sendOnce(NotificationKind.RECOMMENDATION_FAILED, key, "실패");
 
 		// then
-		verify(telegram).send("실패");
+		verify(telegram).send(TelegramChat.OWNER, "실패");
 	}
 
 	@Test
 	void _3회_실패하면_FAILED이고_예외를_던지지_않는다() {
 		// given
-		doThrow(new TelegramException("HTTP 500")).when(telegram).send(anyString());
+		doThrow(new TelegramException("HTTP 500")).when(telegram).send(any(), anyString());
 
 		// when
 		NotificationStatus result = service.sendOnce(KIND, key, "본문");
@@ -114,13 +116,13 @@ class NotificationServiceTest {
 		assertThat(result).isEqualTo(NotificationStatus.FAILED);
 		assertThat(service.statusOf(KIND, key)).isEqualTo(NotificationStatus.FAILED);
 		assertThat(logs.findByKindAndTargetKey(KIND, key).orElseThrow().getAttempts()).isEqualTo(3);
-		verify(telegram, times(3)).send("본문");
+		verify(telegram, times(3)).send(TelegramChat.OWNER, "본문");
 	}
 
 	@Test
 	void 두번째_시도에_성공하면_SENT이다() {
 		// given
-		doThrow(new TelegramException("HTTP 500")).doNothing().when(telegram).send(anyString());
+		doThrow(new TelegramException("HTTP 500")).doNothing().when(telegram).send(any(), anyString());
 
 		// when
 		NotificationStatus result = service.sendOnce(KIND, key, "본문");
@@ -128,7 +130,7 @@ class NotificationServiceTest {
 		// then
 		assertThat(result).isEqualTo(NotificationStatus.SENT);
 		assertThat(logs.findByKindAndTargetKey(KIND, key).orElseThrow().getAttempts()).isEqualTo(2);
-		verify(telegram, times(2)).send("본문");
+		verify(telegram, times(2)).send(TelegramChat.OWNER, "본문");
 	}
 
 	@Test
@@ -141,7 +143,7 @@ class NotificationServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(NotificationStatus.SKIPPED);
-		verify(telegram, never()).send(anyString());
+		verify(telegram, never()).send(any(), anyString());
 	}
 
 	@Test
@@ -170,9 +172,9 @@ class NotificationServiceTest {
 	@Test
 	void FAILED_기록은_다음_호출에서_다시_보낸다() {
 		// given
-		doThrow(new TelegramException("HTTP 500")).when(telegram).send(anyString());
+		doThrow(new TelegramException("HTTP 500")).when(telegram).send(any(), anyString());
 		service.sendOnce(KIND, key, "본문");
-		doNothing().when(telegram).send(anyString());
+		doNothing().when(telegram).send(any(), anyString());
 
 		// when
 		NotificationStatus result = service.sendOnce(KIND, key, "본문");
@@ -185,7 +187,7 @@ class NotificationServiceTest {
 	@Test
 	void 발송이_3번_모두_실패하면_더_이상_다시_보내지_않는다() {
 		// given: 3번의 발송(각 3회 시도)이 모두 실패했다
-		doThrow(new TelegramException("HTTP 500")).when(telegram).send(anyString());
+		doThrow(new TelegramException("HTTP 500")).when(telegram).send(any(), anyString());
 		service.sendOnce(KIND, key, "본문");
 		service.sendOnce(KIND, key, "본문");
 		service.sendOnce(KIND, key, "본문");
@@ -196,7 +198,7 @@ class NotificationServiceTest {
 		// then
 		assertThat(result).isEqualTo(NotificationStatus.FAILED);
 		assertThat(logs.findByKindAndTargetKey(KIND, key).orElseThrow().getAttempts()).isEqualTo(9);
-		verify(telegram, times(9)).send("본문");
+		verify(telegram, times(9)).send(TelegramChat.OWNER, "본문");
 	}
 
 	@Test
@@ -209,7 +211,7 @@ class NotificationServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(NotificationStatus.PENDING);
-		verify(telegram, never()).send(anyString());
+		verify(telegram, never()).send(any(), anyString());
 	}
 
 	@Test
@@ -222,7 +224,7 @@ class NotificationServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(NotificationStatus.SENT);
-		verify(telegram).send("본문");
+		verify(telegram).send(TelegramChat.OWNER, "본문");
 	}
 
 	@Test
@@ -239,7 +241,101 @@ class NotificationServiceTest {
 
 		// then
 		assertThat(result).isEqualTo(NotificationStatus.PENDING);
-		verify(telegram, never()).send(anyString());
+		verify(telegram, never()).send(any(), anyString());
+	}
+
+	@Test
+	void 가족방이_있으면_추천_알림을_가족방에도_보낸다() {
+		// given
+		when(telegram.hasFamilyChat()).thenReturn(true);
+
+		// when
+		NotificationStatus result = service.sendOnce(KIND, key, "본문");
+
+		// then
+		assertThat(result).isEqualTo(NotificationStatus.SENT);
+		verify(telegram).send(TelegramChat.OWNER, "본문");
+		verify(telegram).send(TelegramChat.FAMILY, "본문");
+		assertThat(logs.findByKindAndTargetKey(KIND, "family:" + key).orElseThrow().getStatus())
+			.isEqualTo(NotificationStatus.SENT);
+	}
+
+	@Test
+	void 추첨_종료_알림도_가족방에_보낸다() {
+		// given
+		when(telegram.hasFamilyChat()).thenReturn(true);
+
+		// when
+		service.sendOnce(NotificationKind.DRAW_FINISHED, key, "종료");
+
+		// then
+		verify(telegram).send(TelegramChat.FAMILY, "종료");
+	}
+
+	@Test
+	void 오류_알림은_가족방에_보내지_않는다() {
+		// given
+		when(telegram.hasFamilyChat()).thenReturn(true);
+
+		// when
+		service.sendOnce(NotificationKind.RECOMMENDATION_FAILED, key, "실패");
+		service.sendOnce(NotificationKind.COLLECTION_FAILED, key, "수집 실패");
+		service.sendOnce(NotificationKind.COLLECTION_ERROR, key, "수집 오류");
+
+		// then
+		verify(telegram, never()).send(eq(TelegramChat.FAMILY), anyString());
+		verify(telegram, times(3)).send(eq(TelegramChat.OWNER), anyString());
+	}
+
+	@Test
+	void 가족방이_없으면_운영자_방에만_보낸다() {
+		// when
+		service.sendOnce(KIND, key, "본문");
+
+		// then
+		verify(telegram).send(TelegramChat.OWNER, "본문");
+		verify(telegram, never()).send(eq(TelegramChat.FAMILY), anyString());
+		assertThat(logs.findByKindAndTargetKey(KIND, "family:" + key)).isEmpty();
+	}
+
+	@Test
+	void 가족방만_실패하면_다음_호출에서_가족방에만_다시_보낸다() {
+		// given
+		when(telegram.hasFamilyChat()).thenReturn(true);
+		doThrow(new TelegramException("HTTP 403")).when(telegram).send(eq(TelegramChat.FAMILY), anyString());
+		service.sendOnce(KIND, key, "본문");
+		doNothing().when(telegram).send(eq(TelegramChat.FAMILY), anyString());
+
+		// when
+		NotificationStatus result = service.sendOnce(KIND, key, "본문");
+
+		// then
+		assertThat(result).isEqualTo(NotificationStatus.SENT);
+		verify(telegram, times(1)).send(TelegramChat.OWNER, "본문");
+		verify(telegram, times(4)).send(TelegramChat.FAMILY, "본문");
+	}
+
+	@Test
+	void 가족방까지_보내야_모두_보낸_것이다() {
+		// given
+		when(telegram.hasFamilyChat()).thenReturn(true);
+		doThrow(new TelegramException("HTTP 403")).when(telegram).send(eq(TelegramChat.FAMILY), anyString());
+
+		// when
+		service.sendOnce(KIND, key, "본문");
+
+		// then
+		assertThat(service.statusOf(KIND, key)).isEqualTo(NotificationStatus.SENT);
+		assertThat(service.isDelivered(KIND, key)).isFalse();
+	}
+
+	@Test
+	void 가족방이_없으면_운영자_방만_보내도_모두_보낸_것이다() {
+		// given
+		service.sendOnce(KIND, key, "본문");
+
+		// when / then
+		assertThat(service.isDelivered(KIND, key)).isTrue();
 	}
 
 }

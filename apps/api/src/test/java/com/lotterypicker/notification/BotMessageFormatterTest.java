@@ -52,7 +52,7 @@ class BotMessageFormatterTest {
 	@Test
 	void 도움말은_메뉴_순서로_명령을_보여_준다() {
 		// given / when
-		String text = BotMessageFormatter.help();
+		String text = BotMessageFormatter.help(TelegramChat.OWNER);
 
 		// then
 		assertThat(text).isEqualTo("""
@@ -207,6 +207,22 @@ class BotMessageFormatterTest {
 				고정 번호: 3, 7
 				제외 번호: 없음
 				바꾸기는 웹의 설정 화면에서 할 수 있습니다.""");
+	}
+
+	@Test
+	void 가족방_도움말에는_설정_보기가_없다() {
+		// given / when
+		String text = BotMessageFormatter.help(TelegramChat.FAMILY);
+
+		// then
+		assertThat(text).isEqualTo("""
+				사용할 수 있는 명령
+				/today 오늘 추천
+				/result 최근 회차 채점 결과
+				/performance 전략별 성적표
+				/round 회차 당첨 정보 (예: /round 1249)
+				/stats 번호 통계 상위 5개
+				/help 명령 목록""");
 	}
 
 }

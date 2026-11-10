@@ -8,6 +8,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -24,31 +25,46 @@ public class TelegramClient {
 	private final String baseUrl;
 	private final String botToken;
 	private final String chatId;
+	private final String familyChatId;
 
 	public TelegramClient(RestClient.Builder builder,
 		@Value("${app.telegram.base-url}") String baseUrl,
 		@Value("${app.telegram.bot-token}") String botToken,
-		@Value("${app.telegram.chat-id}") String chatId) {
+		@Value("${app.telegram.chat-id}") String chatId,
+		@Value("${app.telegram.family-chat-id:}") String familyChatId) {
 		this.restClient = builder.build();
 		this.baseUrl = baseUrl;
 		this.botToken = botToken;
 		this.chatId = chatId;
+		this.familyChatId = familyChatId;
 	}
 
+	/** 운영자 방까지 설정되어야 봇이 동작한다. 가족방만으로는 동작하지 않는다. */
 	public boolean isConfigured() {
 		return !botToken.isBlank() && !chatId.isBlank();
 	}
 
-	/** 설정된 채팅에서 온 메시지인지. 봇은 이 채팅에만 답한다. */
-	public boolean isAllowedChat(long chatId) {
-		return !this.chatId.isBlank() && this.chatId.equals(Long.toString(chatId));
+	public boolean hasFamilyChat() {
+		return isConfigured() && !familyChatId.isBlank();
 	}
 
-	public void send(String text) {
+	/** 메시지가 온 채팅이 설정된 방 중 어느 것인지. 봇은 설정된 방에만 답한다. 두 id가 같으면 운영자 방이다. */
+	public Optional<TelegramChat> chatOf(long chatId) {
+		String id = Long.toString(chatId);
+		if (isConfigured() && this.chatId.equals(id)) {
+			return Optional.of(TelegramChat.OWNER);
+		}
+		if (hasFamilyChat() && familyChatId.equals(id)) {
+			return Optional.of(TelegramChat.FAMILY);
+		}
+		return Optional.empty();
+	}
+
+	public void send(TelegramChat chat, String text) {
 		call(() -> restClient.post()
 			.uri(methodUri("sendMessage"))
 			.contentType(MediaType.APPLICATION_JSON)
-			.body(Map.of("chat_id", chatId, "text", text, "parse_mode", "HTML"))
+			.body(Map.of("chat_id", idOf(chat), "text", text, "parse_mode", "HTML"))
 			.retrieve()
 			.toBodilessEntity());
 	}
@@ -70,14 +86,30 @@ public class TelegramClient {
 		return response.result().stream().map(Update::toUpdate).toList();
 	}
 
-	/** `/` 메뉴에 명령 목록을 등록한다. */
+	/** `/` 메뉴의 기본 명령 목록을 등록한다. 따로 등록하지 않은 모든 채팅에 보인다. */
 	public void setMyCommands(List<BotMenuItem> commands) {
+		registerCommands(Map.of("commands", commands));
+	}
+
+	/** 한 채팅방에만 보일 `/` 메뉴를 등록한다. 기본 목록보다 우선한다. */
+	public void setMyCommands(List<BotMenuItem> commands, TelegramChat chat) {
+		registerCommands(Map.of("commands", commands, "scope", Map.of("type", "chat", "chat_id", idOf(chat))));
+	}
+
+	private void registerCommands(Map<String, Object> body) {
 		call(() -> restClient.post()
 			.uri(methodUri("setMyCommands"))
 			.contentType(MediaType.APPLICATION_JSON)
-			.body(Map.of("commands", commands))
+			.body(body)
 			.retrieve()
 			.toBodilessEntity());
+	}
+
+	private String idOf(TelegramChat chat) {
+		return switch (chat) {
+			case OWNER -> chatId;
+			case FAMILY -> familyChatId;
+		};
 	}
 
 	private <T> T call(Supplier<T> request) {

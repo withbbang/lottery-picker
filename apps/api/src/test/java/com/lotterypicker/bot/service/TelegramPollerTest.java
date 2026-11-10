@@ -14,7 +14,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.lotterypicker.bot.BotCommand;
 import com.lotterypicker.bot.dto.TelegramUpdate;
+import com.lotterypicker.notification.TelegramChat;
 import com.lotterypicker.notification.TelegramClient;
 import com.lotterypicker.notification.TelegramException;
 import java.time.Clock;
@@ -22,6 +24,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,8 +41,9 @@ class TelegramPollerTest {
 	@BeforeEach
 	void setUp() {
 		when(telegram.isConfigured()).thenReturn(true);
-		when(telegram.isAllowedChat(42)).thenReturn(true);
-		when(commands.reply(anyString())).thenReturn("응답");
+		when(telegram.chatOf(42)).thenReturn(Optional.of(TelegramChat.OWNER));
+		when(telegram.chatOf(-1007)).thenReturn(Optional.of(TelegramChat.FAMILY));
+		when(commands.reply(anyString(), any())).thenReturn("응답");
 	}
 
 	private static TelegramUpdate update(long id, long chat, Instant sentAt) {
@@ -55,8 +59,8 @@ class TelegramPollerTest {
 		poller.pollOnce();
 
 		// then
-		verify(commands).reply("/today");
-		verify(telegram).send("응답");
+		verify(commands).reply("/today", TelegramChat.OWNER);
+		verify(telegram).send(TelegramChat.OWNER, "응답");
 	}
 
 	@Test
@@ -82,8 +86,8 @@ class TelegramPollerTest {
 		poller.pollOnce();
 
 		// then
-		verify(commands, never()).reply(anyString());
-		verify(telegram, never()).send(anyString());
+		verify(commands, never()).reply(anyString(), any());
+		verify(telegram, never()).send(any(), anyString());
 		verify(telegram).getUpdates(8, 20);
 	}
 
@@ -95,11 +99,11 @@ class TelegramPollerTest {
 
 		// when
 		poller.pollOnce();
-		verify(telegram, never()).send(anyString());
+		verify(telegram, never()).send(any(), anyString());
 		poller.pollOnce();
 
 		// then
-		verify(telegram).send("응답");
+		verify(telegram).send(TelegramChat.OWNER, "응답");
 	}
 
 	@Test
@@ -111,8 +115,8 @@ class TelegramPollerTest {
 		poller.pollOnce();
 
 		// then
-		verify(commands, never()).reply(anyString());
-		verify(telegram, never()).send(anyString());
+		verify(commands, never()).reply(anyString(), any());
+		verify(telegram, never()).send(any(), anyString());
 	}
 
 	@Test
@@ -120,14 +124,14 @@ class TelegramPollerTest {
 		// given
 		when(telegram.getUpdates(0, 20)).thenReturn(List.of(update(7, 42, NOW),
 				new TelegramUpdate(8, 42L, "/help", NOW)));
-		when(commands.reply("/help")).thenReturn("도움말");
-		doThrow(new TelegramException("실패")).when(telegram).send("응답");
+		when(commands.reply("/help", TelegramChat.OWNER)).thenReturn("도움말");
+		doThrow(new TelegramException("실패")).when(telegram).send(TelegramChat.OWNER, "응답");
 
 		// when
 		poller.pollOnce();
 
 		// then
-		verify(telegram).send("도움말");
+		verify(telegram).send(TelegramChat.OWNER, "도움말");
 	}
 
 	@Test
@@ -161,6 +165,58 @@ class TelegramPollerTest {
 		assertThat(poller.isRunning()).isTrue();
 		release.countDown();
 		poller.stop();
+	}
+
+	@Test
+	void 가족방_명령에는_가족방_기준으로_가족방에_답한다() {
+		// given
+		when(telegram.getUpdates(0, 20)).thenReturn(List.of(update(7, -1007, NOW)));
+		when(commands.reply("/today", TelegramChat.FAMILY)).thenReturn("가족 응답");
+
+		// when
+		poller.pollOnce();
+
+		// then
+		verify(telegram).send(TelegramChat.FAMILY, "가족 응답");
+		verify(telegram, never()).send(TelegramChat.OWNER, "가족 응답");
+	}
+
+	@Test
+	void 가족방의_명령이_아닌_글에는_답하지_않는다() {
+		// given
+		when(telegram.getUpdates(0, 20)).thenReturn(List.of(new TelegramUpdate(7, -1007L, "오늘 저녁 뭐 먹지", NOW)));
+
+		// when
+		poller.pollOnce();
+
+		// then
+		verify(commands, never()).reply(anyString(), any());
+		verify(telegram, never()).send(any(), anyString());
+	}
+
+	@Test
+	void 가족방이_있으면_설정_명령을_뺀_메뉴를_가족방에_등록한다() {
+		// given
+		when(telegram.hasFamilyChat()).thenReturn(true);
+
+		// when
+		poller.start();
+
+		// then
+		verify(telegram, timeout(1000)).setMyCommands(BotCommand.menu(TelegramChat.FAMILY), TelegramChat.FAMILY);
+		verify(telegram).setMyCommands(BotCommand.menu(TelegramChat.OWNER));
+		poller.stop();
+	}
+
+	@Test
+	void 가족방이_없으면_가족방_메뉴를_등록하지_않는다() {
+		// when
+		poller.start();
+
+		// then
+		verify(telegram, timeout(1000)).setMyCommands(BotCommand.menu(TelegramChat.OWNER));
+		poller.stop();
+		verify(telegram, never()).setMyCommands(any(), any());
 	}
 
 }

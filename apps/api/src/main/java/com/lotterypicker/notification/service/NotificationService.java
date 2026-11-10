@@ -2,6 +2,7 @@ package com.lotterypicker.notification.service;
 
 import com.lotterypicker.notification.NotificationKind;
 import com.lotterypicker.notification.NotificationStatus;
+import com.lotterypicker.notification.TelegramChat;
 import com.lotterypicker.notification.TelegramClient;
 import com.lotterypicker.notification.TelegramException;
 import com.lotterypicker.notification.entity.NotificationLog;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 /**
  * 같은 알림을 한 번만 보낸다. 재시도 대기 동안 DB 연결을 잡지 않도록 트랜잭션은 리포지토리 호출 단위로만 쓴다.
  * 발송 실패는 예외 없이 FAILED로 돌려준다. 알림이 실패해도 추천과 수집은 계속되어야 한다.
+ * 가족방에도 보내는 알림은 방마다 따로 기록한다. 한 방의 실패가 다른 방의 중복 발송으로 이어지지 않고, 실패한 방만 다시 보낸다.
  */
 @Slf4j
 @Service
@@ -33,6 +35,9 @@ public class NotificationService {
 	/** 재시도 3회의 최악 시간(약 2분)보다 길게 잡는다. 이보다 오래된 PENDING은 발송 중 서버가 멈춘 기록이다. */
 	private static final Duration STALE_PENDING = Duration.ofMinutes(5);
 
+	/** 가족방 발송 기록의 키 접두사. 운영자 방 기록은 키를 그대로 쓴다. */
+	private static final String FAMILY_KEY_PREFIX = "family:";
+
 	private final TelegramClient telegram;
 	private final NotificationLogRepository logs;
 	private final Clock clock;
@@ -46,15 +51,42 @@ public class NotificationService {
 		this.retryDelayMs = retryDelayMs;
 	}
 
-	/** 다른 호출이 보내는 중이면 PENDING, 이미 보냈으면 SENT를 돌려주고 보내지 않는다. */
+	/**
+	 * 다른 호출이 보내는 중이면 PENDING, 이미 보냈으면 SENT를 돌려주고 보내지 않는다.
+	 * 가족방에도 보내는 알림이면 가족방에도 같은 방식으로 보낸다. 돌려주는 상태는 운영자 방 것이다.
+	 */
 	public NotificationStatus sendOnce(NotificationKind kind, String targetKey, String text) {
 		if (!telegram.isConfigured()) {
 			return NotificationStatus.SKIPPED;
 		}
-		if (!claim(kind, targetKey)) {
-			return statusOf(kind, targetKey);
+		NotificationStatus result = sendOnce(TelegramChat.OWNER, kind, targetKey, text);
+		if (sendsToFamily(kind)) {
+			sendOnce(TelegramChat.FAMILY, kind, familyKey(targetKey), text);
 		}
-		return deliver(kind, targetKey, text);
+		return result;
+	}
+
+	/** 보내야 할 모든 방에 보냈는지. 재발송 대상을 고를 때 쓴다. */
+	public boolean isDelivered(NotificationKind kind, String targetKey) {
+		if (statusOf(kind, targetKey) != NotificationStatus.SENT) {
+			return false;
+		}
+		return !sendsToFamily(kind) || statusOf(kind, familyKey(targetKey)) == NotificationStatus.SENT;
+	}
+
+	private NotificationStatus sendOnce(TelegramChat chat, NotificationKind kind, String key, String text) {
+		if (!claim(kind, key)) {
+			return statusOf(kind, key);
+		}
+		return deliver(chat, kind, key, text);
+	}
+
+	private boolean sendsToFamily(NotificationKind kind) {
+		return kind.sharedWithFamily() && telegram.hasFamilyChat();
+	}
+
+	private static String familyKey(String targetKey) {
+		return FAMILY_KEY_PREFIX + targetKey;
 	}
 
 	/** 텔레그램 설정이 있어 실제로 보낼 수 있는지. 없으면 sendOnce는 기록 없이 SKIPPED다. */
@@ -62,6 +94,7 @@ public class NotificationService {
 		return telegram.isConfigured();
 	}
 
+	/** 운영자 방 발송 상태. */
 	public NotificationStatus statusOf(NotificationKind kind, String targetKey) {
 		return logs.findByKindAndTargetKey(kind, targetKey)
 			.map(NotificationLog::getStatus)
@@ -81,13 +114,13 @@ public class NotificationService {
 		}
 	}
 
-	private NotificationStatus deliver(NotificationKind kind, String targetKey, String text) {
+	private NotificationStatus deliver(TelegramChat chat, NotificationKind kind, String targetKey, String text) {
 		int attempts = 0;
 		NotificationStatus result = NotificationStatus.FAILED;
 		while (attempts < MAX_ATTEMPTS && result != NotificationStatus.SENT) {
 			attempts++;
 			try {
-				telegram.send(text);
+				telegram.send(chat, text);
 				result = NotificationStatus.SENT;
 			} catch (TelegramException e) {
 				log.warn("텔레그램 발송 실패 {}/{}: {} {} - {}", attempts, MAX_ATTEMPTS, kind, targetKey, e.getMessage());

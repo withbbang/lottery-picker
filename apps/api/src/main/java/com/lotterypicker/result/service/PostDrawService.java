@@ -5,7 +5,6 @@ import com.lotterypicker.lotto.LottoNumbers;
 import com.lotterypicker.lotto.PrizeRank;
 import com.lotterypicker.notification.MessageFormatter;
 import com.lotterypicker.notification.NotificationKind;
-import com.lotterypicker.notification.NotificationStatus;
 import com.lotterypicker.notification.service.NotificationService;
 import com.lotterypicker.recommendation.entity.DailyRecommendation;
 import com.lotterypicker.recommendation.repository.DailyRecommendationRepository;
@@ -66,7 +65,7 @@ public class PostDrawService {
 	}
 
 	/**
-	 * 종료 알림을 아직 보내지 못한 최근 회차를 다시 처리한다. 발송 실패(FAILED)나 채점 후 알림 전에 멈춘 경우를 잡는다.
+	 * 종료 알림을 아직 모든 방에 보내지 못한 최근 회차를 다시 처리한다. 발송 실패(FAILED)나 채점 후 알림 전에 멈춘 경우를 잡는다.
 	 * 추첨일로부터 7일 안의 회차만 본다. 지난주 회차를 이번 주에 새 소식처럼 보내지 않기 위해서다.
 	 * 그런 회차는 최신 회차와 직전 회차뿐이므로 두 회차만 조회한다. 이미 보냈거나 텔레그램 설정이 없으면 건드리지 않는다.
 	 * 늦게 수집한 회차는 수집 경로의 {@link #process(int)}가 기간과 관계없이 채점하고 알린다.
@@ -80,8 +79,7 @@ public class PostDrawService {
 			for (int round : List.of(latest.getRoundNo() - 1, latest.getRoundNo())) {
 				rounds.findById(round)
 					.filter(drawn -> withinNotifyWindow(drawn, today))
-					.filter(drawn -> notifications.statusOf(NotificationKind.DRAW_FINISHED, String.valueOf(round))
-							!= NotificationStatus.SENT)
+					.filter(drawn -> !notifications.isDelivered(NotificationKind.DRAW_FINISHED, String.valueOf(round)))
 					.ifPresent(this::process);
 			}
 		});

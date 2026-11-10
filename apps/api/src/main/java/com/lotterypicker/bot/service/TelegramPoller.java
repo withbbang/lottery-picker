@@ -2,11 +2,13 @@ package com.lotterypicker.bot.service;
 
 import com.lotterypicker.bot.BotCommand;
 import com.lotterypicker.bot.dto.TelegramUpdate;
+import com.lotterypicker.notification.TelegramChat;
 import com.lotterypicker.notification.TelegramClient;
 import com.lotterypicker.notification.TelegramException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.SmartLifecycle;
@@ -85,12 +87,23 @@ public class TelegramPoller implements SmartLifecycle {
 		}
 	}
 
-	/** 메뉴 등록은 부가 기능이라 폴링 스레드에서 한다. 텔레그램이 느려도 앱 기동을 막지 않게. */
+	/**
+	 * 메뉴 등록은 부가 기능이라 폴링 스레드에서 한다. 텔레그램이 느려도 앱 기동을 막지 않게.
+	 * 운영자 방은 기본 메뉴를 쓰고, 가족방은 그 방에만 보이는 메뉴를 따로 등록한다.
+	 */
 	private void registerMenu() {
 		try {
-			telegram.setMyCommands(BotCommand.menu());
+			telegram.setMyCommands(BotCommand.menu(TelegramChat.OWNER));
 		} catch (TelegramException e) {
 			log.warn("텔레그램 명령 메뉴 등록 실패: {}", e.getMessage());
+		}
+		if (!telegram.hasFamilyChat()) {
+			return;
+		}
+		try {
+			telegram.setMyCommands(BotCommand.menu(TelegramChat.FAMILY), TelegramChat.FAMILY);
+		} catch (TelegramException e) {
+			log.warn("가족방 명령 메뉴 등록 실패: {}", e.getMessage());
 		}
 	}
 
@@ -105,8 +118,13 @@ public class TelegramPoller implements SmartLifecycle {
 		if (update.chatId() == null || update.text() == null || update.sentAt() == null) {
 			return;
 		}
-		if (!telegram.isAllowedChat(update.chatId())) {
+		Optional<TelegramChat> chat = telegram.chatOf(update.chatId());
+		if (chat.isEmpty()) {
 			log.info("허용되지 않은 채팅의 메시지를 무시합니다: chat={}", update.chatId());
+			return;
+		}
+		if (chat.get() == TelegramChat.FAMILY && !update.text().strip().startsWith("/")) {
+			// 가족방은 여럿이 대화하는 방이라 명령이 아닌 글에는 답하지 않는다.
 			return;
 		}
 		if (update.sentAt().isBefore(Instant.now(clock).minus(STALE_AFTER))) {
@@ -114,7 +132,7 @@ public class TelegramPoller implements SmartLifecycle {
 			return;
 		}
 		try {
-			telegram.send(commands.reply(update.text()));
+			telegram.send(chat.get(), commands.reply(update.text(), chat.get()));
 		} catch (TelegramException e) {
 			log.warn("텔레그램 명령 응답 전송 실패: {}", e.getMessage());
 		}

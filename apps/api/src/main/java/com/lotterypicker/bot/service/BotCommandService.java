@@ -5,6 +5,7 @@ import com.lotterypicker.bot.BotCommand.Parsed;
 import com.lotterypicker.common.BusinessException;
 import com.lotterypicker.common.ErrorCode;
 import com.lotterypicker.notification.BotMessageFormatter;
+import com.lotterypicker.notification.TelegramChat;
 import com.lotterypicker.recommendation.service.DailyRecommendationService;
 import com.lotterypicker.recommendation.service.RecommendationSettingsService;
 import com.lotterypicker.result.service.PostDrawService;
@@ -34,16 +35,20 @@ public class BotCommandService {
 	private final NumberStatisticsService statistics;
 	private final RecommendationSettingsService settings;
 
-	public String reply(String text) {
+	/** {@code chat}에서 쓸 수 없는 명령은 모르는 명령과 같게 답한다. */
+	public String reply(String text, TelegramChat chat) {
 		try {
-			return BotCommand.parse(text).map(this::handle).orElseGet(BotMessageFormatter::unknown);
+			return BotCommand.parse(text)
+				.filter(parsed -> parsed.command().availableIn(chat))
+				.map(parsed -> handle(parsed, chat))
+				.orElseGet(BotMessageFormatter::unknown);
 		} catch (RuntimeException e) {
 			log.error("텔레그램 명령 처리 실패", e);
 			return BotMessageFormatter.error();
 		}
 	}
 
-	private String handle(Parsed parsed) {
+	private String handle(Parsed parsed, TelegramChat chat) {
 		return switch (parsed.command()) {
 			case TODAY -> today();
 			case RESULT -> postDraw.latestSummary().map(BotMessageFormatter::result).orElseGet(BotMessageFormatter::noResult);
@@ -51,7 +56,7 @@ public class BotCommandService {
 			case ROUND -> round(parsed.argument());
 			case STATS -> statistics.find(null).map(BotMessageFormatter::stats).orElseGet(BotMessageFormatter::noStats);
 			case SETTINGS -> BotMessageFormatter.settings(settings.get());
-			case HELP -> BotMessageFormatter.help();
+			case HELP -> BotMessageFormatter.help(chat);
 		};
 	}
 

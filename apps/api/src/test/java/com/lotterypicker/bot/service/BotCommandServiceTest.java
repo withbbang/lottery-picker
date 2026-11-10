@@ -12,6 +12,7 @@ import com.lotterypicker.common.ErrorCode;
 import com.lotterypicker.lotto.LottoNumbers;
 import com.lotterypicker.notification.BotMessageFormatter;
 import com.lotterypicker.notification.NotificationStatus;
+import com.lotterypicker.notification.TelegramChat;
 import com.lotterypicker.recommendation.RecommendationSet;
 import com.lotterypicker.recommendation.StoredLine;
 import com.lotterypicker.recommendation.dto.RecommendationSetResponse;
@@ -63,7 +64,7 @@ class BotCommandServiceTest {
 		when(recommendations.findSet(TODAY)).thenReturn(Optional.of(set));
 
 		// when / then
-		assertThat(service.reply("/today")).isEqualTo(BotMessageFormatter.today(latest, set));
+		assertThat(service.reply("/today", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.today(latest, set));
 	}
 
 	@Test
@@ -73,7 +74,7 @@ class BotCommandServiceTest {
 		when(recommendations.findLatest(TODAY)).thenReturn(Optional.empty());
 
 		// when / then
-		assertThat(service.reply("/today")).isEqualTo(BotMessageFormatter.noRecommendation());
+		assertThat(service.reply("/today", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.noRecommendation());
 	}
 
 	@Test
@@ -84,7 +85,7 @@ class BotCommandServiceTest {
 		when(postDraw.latestSummary()).thenReturn(Optional.of(summary));
 
 		// when / then
-		assertThat(service.reply("/result")).isEqualTo(BotMessageFormatter.result(summary));
+		assertThat(service.reply("/result", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.result(summary));
 	}
 
 	@Test
@@ -93,7 +94,7 @@ class BotCommandServiceTest {
 		when(postDraw.latestSummary()).thenReturn(Optional.empty());
 
 		// when / then
-		assertThat(service.reply("/result")).isEqualTo(BotMessageFormatter.noResult());
+		assertThat(service.reply("/result", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.noResult());
 	}
 
 	@Test
@@ -106,7 +107,7 @@ class BotCommandServiceTest {
 		when(rounds.winningStores(1249, 1, null)).thenReturn(stores);
 
 		// when
-		String text = service.reply("/round 1249");
+		String text = service.reply("/round 1249", TelegramChat.OWNER);
 
 		// then
 		assertThat(text).isEqualTo(BotMessageFormatter.round(detail, stores));
@@ -117,7 +118,7 @@ class BotCommandServiceTest {
 	void round_인자가_잘못되면_사용법을_답한다() {
 		// given / when / then
 		for (String text : List.of("/round", "/round abc", "/round 0", "/round -1", "/round 99999999999")) {
-			assertThat(service.reply(text)).as(text).isEqualTo(BotMessageFormatter.roundUsage());
+			assertThat(service.reply(text, TelegramChat.OWNER)).as(text).isEqualTo(BotMessageFormatter.roundUsage());
 		}
 		verifyNoInteractions(rounds);
 	}
@@ -128,7 +129,7 @@ class BotCommandServiceTest {
 		when(rounds.detail(anyInt())).thenThrow(new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 
 		// when / then
-		assertThat(service.reply("/round 1300")).isEqualTo(BotMessageFormatter.roundNotFound("1300"));
+		assertThat(service.reply("/round 1300", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.roundNotFound("1300"));
 	}
 
 	@Test
@@ -142,10 +143,10 @@ class BotCommandServiceTest {
 		when(settings.get()).thenReturn(current);
 
 		// when / then
-		assertThat(service.reply("/stats")).isEqualTo(BotMessageFormatter.stats(stats));
-		assertThat(service.reply("/performance")).isEqualTo(BotMessageFormatter.performance(perf));
-		assertThat(service.reply("/settings")).isEqualTo(BotMessageFormatter.settings(current));
-		assertThat(service.reply("/help")).isEqualTo(BotMessageFormatter.help());
+		assertThat(service.reply("/stats", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.stats(stats));
+		assertThat(service.reply("/performance", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.performance(perf));
+		assertThat(service.reply("/settings", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.settings(current));
+		assertThat(service.reply("/help", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.help(TelegramChat.OWNER));
 	}
 
 	@Test
@@ -154,14 +155,14 @@ class BotCommandServiceTest {
 		when(statistics.find(null)).thenReturn(Optional.empty());
 
 		// when / then
-		assertThat(service.reply("/stats")).isEqualTo(BotMessageFormatter.noStats());
+		assertThat(service.reply("/stats", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.noStats());
 	}
 
 	@Test
 	void 모르는_명령이나_일반_글은_안내한다() {
 		// given / when / then
-		assertThat(service.reply("/foo")).isEqualTo(BotMessageFormatter.unknown());
-		assertThat(service.reply("안녕")).isEqualTo(BotMessageFormatter.unknown());
+		assertThat(service.reply("/foo", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.unknown());
+		assertThat(service.reply("안녕", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.unknown());
 	}
 
 	@Test
@@ -170,7 +171,26 @@ class BotCommandServiceTest {
 		when(performances.performances()).thenThrow(new IllegalStateException("boom"));
 
 		// when / then
-		assertThat(service.reply("/performance")).isEqualTo(BotMessageFormatter.error());
+		assertThat(service.reply("/performance", TelegramChat.OWNER)).isEqualTo(BotMessageFormatter.error());
+	}
+
+	@Test
+	void 가족방의_settings는_모르는_명령으로_답하고_설정을_읽지_않는다() {
+		// when
+		String reply = service.reply("/settings", TelegramChat.FAMILY);
+
+		// then
+		assertThat(reply).isEqualTo(BotMessageFormatter.unknown());
+		verifyNoInteractions(settings);
+	}
+
+	@Test
+	void 가족방의_help는_가족방_명령만_보여_준다() {
+		// when
+		String reply = service.reply("/help", TelegramChat.FAMILY);
+
+		// then
+		assertThat(reply).isEqualTo(BotMessageFormatter.help(TelegramChat.FAMILY)).doesNotContain("/settings");
 	}
 
 }

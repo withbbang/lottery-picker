@@ -1,6 +1,7 @@
 package com.lotterypicker.bot;
 
 import com.lotterypicker.bot.dto.BotMenuItem;
+import com.lotterypicker.notification.TelegramChat;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -15,6 +16,7 @@ public enum BotCommand {
 	PERFORMANCE("전략별 성적표"),
 	ROUND("회차 당첨 정보 (예: /round 1249)"),
 	STATS("번호 통계 상위 5개"),
+	/** 운영자 방에서만 쓴다. 가족방에서는 모르는 명령으로 답하고 메뉴에도 없다. */
 	SETTINGS("고정·제외 번호 보기"),
 	HELP("명령 목록");
 
@@ -33,6 +35,11 @@ public enum BotCommand {
 
 	public String description() {
 		return description;
+	}
+
+	/** 이 방에서 쓸 수 있는 명령인지. */
+	public boolean availableIn(TelegramChat chat) {
+		return chat == TelegramChat.OWNER || this != SETTINGS;
 	}
 
 	public record Parsed(BotCommand command, @Nullable String argument) {
@@ -56,8 +63,12 @@ public enum BotCommand {
 			.map(command -> new Parsed(command, argument));
 	}
 
-	public static List<BotMenuItem> menu() {
-		return Arrays.stream(values()).map(command -> new BotMenuItem(command.command(), command.description)).toList();
+	/** 이 방에서 쓸 수 있는 명령의 메뉴. */
+	public static List<BotMenuItem> menu(TelegramChat chat) {
+		return Arrays.stream(values())
+			.filter(command -> command.availableIn(chat))
+			.map(command -> new BotMenuItem(command.command(), command.description))
+			.toList();
 	}
 
 }

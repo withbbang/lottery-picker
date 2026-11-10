@@ -23,7 +23,8 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 @RestClientTest(value = TelegramClient.class,
-		properties = { "app.telegram.bot-token=123:secret", "app.telegram.chat-id=42" })
+		properties = { "app.telegram.bot-token=123:secret", "app.telegram.chat-id=42",
+				"app.telegram.family-chat-id=-1007" })
 class TelegramClientTest {
 
 	private static final String TOKEN = "123:secret";
@@ -45,7 +46,7 @@ class TelegramClientTest {
 			.andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
 
 		// when
-		client.send("안녕");
+		client.send(TelegramChat.OWNER, "안녕");
 
 		// then
 		server.verify();
@@ -59,7 +60,7 @@ class TelegramClientTest {
 			.andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
 
 		// when
-		client.send("<pre>1</pre>");
+		client.send(TelegramChat.OWNER, "<pre>1</pre>");
 
 		// then
 		server.verify();
@@ -71,7 +72,7 @@ class TelegramClientTest {
 		server.expect(requestTo(URL)).andRespond(withServerError());
 
 		// when, then
-		assertThatThrownBy(() -> client.send("안녕")).isInstanceOf(TelegramException.class)
+		assertThatThrownBy(() -> client.send(TelegramChat.OWNER, "안녕")).isInstanceOf(TelegramException.class)
 			.hasMessageContaining("500")
 			.hasMessageNotContaining(TOKEN)
 			.hasNoCause();
@@ -83,7 +84,7 @@ class TelegramClientTest {
 		server.expect(requestTo(URL)).andRespond(withException(new IOException("connection refused")));
 
 		// when, then
-		assertThatThrownBy(() -> client.send("안녕")).isInstanceOf(TelegramException.class)
+		assertThatThrownBy(() -> client.send(TelegramChat.OWNER, "안녕")).isInstanceOf(TelegramException.class)
 			.hasMessageNotContaining(TOKEN)
 			.hasNoCause();
 	}
@@ -94,9 +95,9 @@ class TelegramClientTest {
 		String base = "https://api.telegram.org";
 
 		// when, then
-		assertThat(new TelegramClient(RestClient.builder(), base, TOKEN, "42").isConfigured()).isTrue();
-		assertThat(new TelegramClient(RestClient.builder(), base, "", "42").isConfigured()).isFalse();
-		assertThat(new TelegramClient(RestClient.builder(), base, TOKEN, "").isConfigured()).isFalse();
+		assertThat(new TelegramClient(RestClient.builder(), base, TOKEN, "42", "").isConfigured()).isTrue();
+		assertThat(new TelegramClient(RestClient.builder(), base, "", "42", "").isConfigured()).isFalse();
+		assertThat(new TelegramClient(RestClient.builder(), base, TOKEN, "", "-1007").isConfigured()).isFalse();
 	}
 
 	private static final String UPDATES_URL = "https://api.telegram.org/bot" + TOKEN + "/getUpdates";
@@ -165,10 +166,77 @@ class TelegramClientTest {
 	}
 
 	@Test
-	void 설정된_채팅만_허용한다() {
+	void 설정된_채팅만_어느_방인지_알려_준다() {
 		// given / when / then
-		assertThat(client.isAllowedChat(42)).isTrue();
-		assertThat(client.isAllowedChat(43)).isFalse();
+		assertThat(client.chatOf(42)).contains(TelegramChat.OWNER);
+		assertThat(client.chatOf(-1007)).contains(TelegramChat.FAMILY);
+		assertThat(client.chatOf(43)).isEmpty();
+	}
+
+	@Test
+	void 가족방_id가_비어_있으면_가족방이_없다() {
+		// given
+		TelegramClient ownerOnly = new TelegramClient(RestClient.builder(), "https://api.telegram.org", TOKEN, "42", "");
+
+		// when / then
+		assertThat(ownerOnly.hasFamilyChat()).isFalse();
+		assertThat(ownerOnly.chatOf(-1007)).isEmpty();
+		assertThat(client.hasFamilyChat()).isTrue();
+	}
+
+	@Test
+	void 운영자_방이_없으면_가족방도_쓰지_않는다() {
+		// given
+		TelegramClient familyOnly = new TelegramClient(RestClient.builder(), "https://api.telegram.org", TOKEN, "",
+				"-1007");
+
+		// when / then
+		assertThat(familyOnly.hasFamilyChat()).isFalse();
+		assertThat(familyOnly.chatOf(-1007)).isEmpty();
+	}
+
+	@Test
+	void 가족방으로_보내면_가족방_id로_보낸다() {
+		// given
+		server.expect(requestTo(URL))
+			.andExpect(jsonPath("$.chat_id").value("-1007"))
+			.andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
+
+		// when
+		client.send(TelegramChat.FAMILY, "안녕");
+
+		// then
+		server.verify();
+	}
+
+	@Test
+	void 가족방_메뉴는_그_방_범위로_등록한다() {
+		// given
+		server.expect(requestTo("https://api.telegram.org/bot" + TOKEN + "/setMyCommands"))
+			.andExpect(jsonPath("$.commands[0].command").value("today"))
+			.andExpect(jsonPath("$.scope.type").value("chat"))
+			.andExpect(jsonPath("$.scope.chat_id").value("-1007"))
+			.andRespond(withSuccess("{\"ok\":true,\"result\":true}", MediaType.APPLICATION_JSON));
+
+		// when
+		client.setMyCommands(List.of(new BotMenuItem("today", "오늘 추천")), TelegramChat.FAMILY);
+
+		// then
+		server.verify();
+	}
+
+	@Test
+	void 기본_메뉴는_범위_없이_등록한다() {
+		// given
+		server.expect(requestTo("https://api.telegram.org/bot" + TOKEN + "/setMyCommands"))
+			.andExpect(jsonPath("$.scope").doesNotExist())
+			.andRespond(withSuccess("{\"ok\":true,\"result\":true}", MediaType.APPLICATION_JSON));
+
+		// when
+		client.setMyCommands(List.of(new BotMenuItem("today", "오늘 추천")));
+
+		// then
+		server.verify();
 	}
 
 }
