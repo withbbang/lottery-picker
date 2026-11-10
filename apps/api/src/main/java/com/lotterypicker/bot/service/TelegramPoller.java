@@ -123,8 +123,8 @@ public class TelegramPoller implements SmartLifecycle {
 			log.info("허용되지 않은 채팅의 메시지를 무시합니다: chat={}", update.chatId());
 			return;
 		}
-		if (chat.get() == TelegramChat.FAMILY && !update.text().strip().startsWith("/")) {
-			// 가족방은 여럿이 대화하는 방이라 명령이 아닌 글에는 답하지 않는다.
+		if (chat.get() == TelegramChat.FAMILY && BotCommand.parse(update.text()).isEmpty()) {
+			// 가족방은 여럿이 대화하는 방이라 일반 글이나 모르는 '/' 글에는 답하지 않는다.
 			return;
 		}
 		if (update.sentAt().isBefore(Instant.now(clock).minus(STALE_AFTER))) {

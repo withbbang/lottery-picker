@@ -219,4 +219,42 @@ class TelegramPollerTest {
 		verify(telegram, never()).setMyCommands(any(), any());
 	}
 
+	@Test
+	void 가족방의_모르는_슬래시_글에는_답하지_않는다() {
+		// given
+		when(telegram.getUpdates(0, 20)).thenReturn(List.of(new TelegramUpdate(7, -1007L, "/아", NOW)));
+
+		// when
+		poller.pollOnce();
+
+		// then
+		verify(commands, never()).reply(anyString(), any());
+		verify(telegram, never()).send(any(), anyString());
+	}
+
+	@Test
+	void 가족방의_settings에는_모르는_명령으로_답한다() {
+		// given
+		when(telegram.getUpdates(0, 20)).thenReturn(List.of(new TelegramUpdate(7, -1007L, "/settings", NOW)));
+		when(commands.reply("/settings", TelegramChat.FAMILY)).thenReturn("모르는 명령");
+
+		// when
+		poller.pollOnce();
+
+		// then
+		verify(telegram).send(TelegramChat.FAMILY, "모르는 명령");
+	}
+
+	@Test
+	void 운영자_방의_모르는_명령에는_지금처럼_답한다() {
+		// given
+		when(telegram.getUpdates(0, 20)).thenReturn(List.of(new TelegramUpdate(7, 42L, "/아", NOW)));
+
+		// when
+		poller.pollOnce();
+
+		// then
+		verify(telegram).send(TelegramChat.OWNER, "응답");
+	}
+
 }

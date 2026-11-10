@@ -61,7 +61,7 @@ public class NotificationService {
 		}
 		NotificationStatus result = sendOnce(TelegramChat.OWNER, kind, targetKey, text);
 		if (sendsToFamily(kind)) {
-			sendOnce(TelegramChat.FAMILY, kind, familyKey(targetKey), text);
+			sendToFamily(kind, targetKey, text);
 		}
 		return result;
 	}
@@ -79,6 +79,15 @@ public class NotificationService {
 			return statusOf(kind, key);
 		}
 		return deliver(chat, kind, key, text);
+	}
+
+	/** 가족방 발송은 부가 기능이다. 기록 중 DB 오류가 나도 이미 끝난 운영자 방 발송과 호출한 잡을 깨뜨리지 않는다. */
+	private void sendToFamily(NotificationKind kind, String targetKey, String text) {
+		try {
+			sendOnce(TelegramChat.FAMILY, kind, familyKey(targetKey), text);
+		} catch (RuntimeException e) {
+			log.warn("가족방 알림 처리 실패: {} {} - {}", kind, targetKey, e.getMessage());
+		}
 	}
 
 	private boolean sendsToFamily(NotificationKind kind) {

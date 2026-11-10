@@ -338,4 +338,24 @@ class NotificationServiceTest {
 		assertThat(service.isDelivered(KIND, key)).isTrue();
 	}
 
+	@Test
+	void 가족방_기록_중_오류가_나도_운영자_방_결과를_돌려준다() {
+		// given: 운영자 방 키는 정상, 가족방 키 조회에서 DB 오류가 난다
+		NotificationLogRepository failing = mock(NotificationLogRepository.class);
+		when(failing.findByKindAndTargetKey(KIND, key)).thenReturn(Optional.empty(),
+				Optional.of(NotificationLog.pending(KIND, key, NOW)));
+		when(failing.findByKindAndTargetKey(KIND, "family:" + key)).thenThrow(new IllegalStateException("db"));
+		when(failing.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(telegram.hasFamilyChat()).thenReturn(true);
+		NotificationService failingService = new NotificationService(telegram, failing, CLOCK, 0);
+
+		// when
+		NotificationStatus result = failingService.sendOnce(KIND, key, "본문");
+
+		// then
+		assertThat(result).isEqualTo(NotificationStatus.SENT);
+		verify(telegram).send(TelegramChat.OWNER, "본문");
+		verify(telegram, never()).send(eq(TelegramChat.FAMILY), anyString());
+	}
+
 }

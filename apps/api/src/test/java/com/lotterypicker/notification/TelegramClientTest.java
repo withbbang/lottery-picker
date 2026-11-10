@@ -239,4 +239,14 @@ class TelegramClientTest {
 		server.verify();
 	}
 
+	@Test
+	void 가족방_id가_운영자_방과_같으면_가족방이_없다() {
+		// given
+		TelegramClient same = new TelegramClient(RestClient.builder(), "https://api.telegram.org", TOKEN, "42", "42");
+
+		// when / then
+		assertThat(same.hasFamilyChat()).isFalse();
+		assertThat(same.chatOf(42)).contains(TelegramChat.OWNER);
+	}
+
 }

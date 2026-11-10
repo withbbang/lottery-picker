@@ -44,8 +44,9 @@ public class TelegramClient {
 		return !botToken.isBlank() && !chatId.isBlank();
 	}
 
+	/** 운영자 방과 같은 id면 가족방이 없는 것으로 본다. 같은 방에 알림이 두 번 가거나 메뉴가 덮어써지지 않게. */
 	public boolean hasFamilyChat() {
-		return isConfigured() && !familyChatId.isBlank();
+		return isConfigured() && !familyChatId.isBlank() && !familyChatId.equals(chatId);
 	}
 
 	/** 메시지가 온 채팅이 설정된 방 중 어느 것인지. 봇은 설정된 방에만 답한다. 두 id가 같으면 운영자 방이다. */
