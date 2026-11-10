@@ -86,7 +86,7 @@ public final class MessageFormatter {
 				+ "잘못된 값은 저장하지 않았습니다. 서버 로그를 확인해 주세요.";
 	}
 
-	private static String dateWithDay(LocalDate date) {
+	static String dateWithDay(LocalDate date) {
 		return date + "(" + date.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN) + ")";
 	}
 
@@ -100,7 +100,7 @@ public final class MessageFormatter {
 			.collect(Collectors.joining(" · "));
 	}
 
-	private static String won(long amount) {
+	static String won(long amount) {
 		return String.format(Locale.KOREA, "%,d원", amount);
 	}
 
@@ -115,7 +115,7 @@ public final class MessageFormatter {
 		};
 	}
 
-	private static String label(StrategyType strategy) {
+	static String label(StrategyType strategy) {
 		return switch (strategy) {
 			case RECENT_HOT -> "최근 빈도";
 			case LONG_COLD -> "장기 미출현";
