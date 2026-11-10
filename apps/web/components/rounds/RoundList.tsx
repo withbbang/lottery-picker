@@ -8,19 +8,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
 import { DrawnBalls } from "@/components/lotto/LottoBall";
+import { Pagination } from "@/components/ui/Pagination";
 import type { PageResponse, RoundSummaryResponse } from "@/types/api/round";
 
 const PAGE_SIZE = 20;
-const PAGE_WINDOW = 5;
-const PAGE_BUTTON =
-  "flex size-9 items-center justify-center rounded-md font-medium hover:bg-surface disabled:opacity-30 disabled:hover:bg-transparent";
-
-/** 현재 페이지가 속한 5개 묶음(1~5, 6~10…)의 0부터 센 페이지 번호. */
-function pageWindow(page: number, totalPages: number) {
-  const start = Math.floor(page / PAGE_WINDOW) * PAGE_WINDOW;
-  const end = Math.min(start + PAGE_WINDOW, totalPages);
-  return Array.from({ length: end - start }, (_, i) => start + i);
-}
 
 export function RoundList() {
   const [page, setPage] = useState(0);
@@ -66,67 +57,11 @@ export function RoundList() {
           </li>
         ))}
       </ul>
-      <nav
-        aria-label="페이지"
-        className="flex items-center justify-center gap-0.5 text-sm tabular-nums"
-      >
-        <button
-          type="button"
-          aria-label="첫 페이지"
-          className={PAGE_BUTTON}
-          disabled={page === 0}
-          onClick={() => setPage(0)}
-        >
-          <span aria-hidden="true">«</span>
-        </button>
-        <button
-          type="button"
-          aria-label="이전 페이지"
-          className={PAGE_BUTTON}
-          disabled={page === 0}
-          onClick={() => setPage((p) => p - 1)}
-        >
-          <span aria-hidden="true">‹</span>
-        </button>
-        {pageWindow(data.page, data.totalPages).map((p) =>
-          p === data.page ? (
-            <span
-              key={p}
-              aria-current="page"
-              className="flex size-9 items-center justify-center rounded-md bg-slip font-semibold text-on-slip"
-            >
-              {p + 1}
-            </span>
-          ) : (
-            <button
-              key={p}
-              type="button"
-              className={`${PAGE_BUTTON} text-muted hover:text-ink`}
-              onClick={() => setPage(p)}
-            >
-              {p + 1}
-            </button>
-          ),
-        )}
-        <button
-          type="button"
-          aria-label="다음 페이지"
-          className={PAGE_BUTTON}
-          disabled={page + 1 >= data.totalPages}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          <span aria-hidden="true">›</span>
-        </button>
-        <button
-          type="button"
-          aria-label="마지막 페이지"
-          className={PAGE_BUTTON}
-          disabled={page + 1 >= data.totalPages}
-          onClick={() => setPage(data.totalPages - 1)}
-        >
-          <span aria-hidden="true">»</span>
-        </button>
-      </nav>
+      <Pagination
+        page={data.page}
+        totalPages={data.totalPages}
+        onChange={setPage}
+      />
     </div>
   );
 }

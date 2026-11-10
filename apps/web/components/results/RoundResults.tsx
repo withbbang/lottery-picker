@@ -16,7 +16,7 @@ const RANKS: PrizeRank[] = [
   "NONE",
 ];
 
-const RANK_LABELS: Record<PrizeRank, string> = {
+export const RANK_LABELS: Record<PrizeRank, string> = {
   FIRST: "1등",
   SECOND: "2등",
   THIRD: "3등",

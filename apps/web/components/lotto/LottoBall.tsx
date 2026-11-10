@@ -13,16 +13,28 @@ const SIZES = {
   lg: "size-9 text-sm sm:size-11 sm:text-base",
 } as const;
 
+/**
+ * missed면 채점한 용지처럼 색을 빼고 테두리만 남긴다. bonus면 색을 두고 용지 빨강 테두리를 두른다.
+ * 맞았는지, 보너스인지는 서버가 알려 준 대로만 쓴다.
+ */
 export function LottoBall({
   value,
   size = "md",
+  missed = false,
+  bonus = false,
 }: {
   value: number;
   size?: keyof typeof SIZES;
+  missed?: boolean;
+  bonus?: boolean;
 }) {
+  const tone = missed
+    ? "border border-rule font-medium text-muted"
+    : `font-bold text-ball-ink ${ballColor(value)}`;
+  const ring = bonus ? "ring-2 ring-slip ring-offset-2 ring-offset-surface" : "";
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full font-bold text-ball-ink tabular-nums ${ballColor(value)} ${SIZES[size]}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full tabular-nums ${tone} ${ring} ${SIZES[size]}`}
     >
       {value}
     </span>
