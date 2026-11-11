@@ -15,10 +15,16 @@ public final class PopularityFilter {
 
 	public static boolean isPopular(LottoNumbers n, Set<LottoNumbers> pastWinners) {
 		List<Integer> values = n.values();
-		return values.get(values.size() - 1) <= BIRTHDAY_MAX
-				|| hasConsecutiveRun(values)
-				|| isArithmetic(values)
-				|| pastWinners.contains(n);
+		return values.get(values.size() - 1) <= BIRTHDAY_MAX || isPopularExceptBirthday(n, pastWinners);
+	}
+
+	/**
+	 * 생일 규칙(전부 31 이하)만 뺀 판정. 근거 조합은 근거 번호로만 줄을 만들어, 근거 번호가 모두 31 이하인 날 생일 규칙을
+	 * 쓰면 후보가 전부 걸러진다.
+	 */
+	public static boolean isPopularExceptBirthday(LottoNumbers n, Set<LottoNumbers> pastWinners) {
+		List<Integer> values = n.values();
+		return hasConsecutiveRun(values) || isArithmetic(values) || pastWinners.contains(n);
 	}
 
 	private static boolean hasConsecutiveRun(List<Integer> values) {

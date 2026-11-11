@@ -255,13 +255,14 @@ class RecommendationEngineTest {
 	}
 
 	@Test
-	void 근거_조합에는_인기_조합이_없다() {
+	void 근거_조합에는_생일_규칙_말고는_인기_조합이_없다() {
 		// when
 		GeneratedSet set = engine.generate(HISTORY, RecommendationConstraint.NONE, new Random(32));
 
-		// then
+		// then: 재료가 모두 31 이하인 날 근거 조합이 통째로 사라지지 않도록 생일 규칙은 근거 조합에 쓰지 않는다
 		Set<LottoNumbers> winners = HISTORY.draws().stream().map(HistoricalDraw::numbers).collect(Collectors.toSet());
-		assertThat(set.combined()).noneMatch(line -> PopularityFilter.isPopular(line.numbers(), winners));
+		assertThat(set.combined())
+			.noneMatch(line -> PopularityFilter.isPopularExceptBirthday(line.numbers(), winners));
 	}
 
 	@Test

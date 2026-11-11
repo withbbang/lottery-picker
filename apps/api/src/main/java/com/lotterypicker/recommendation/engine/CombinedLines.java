@@ -49,7 +49,7 @@ public final class CombinedLines {
 	/**
 	 * @param sources 확정된 다섯 전략 줄
 	 * @param fixed 모든 줄에 들어가는 고정 번호
-	 * @param rejected 건너뛸 조합(실제 추천은 인기 조합, 시뮬레이션은 없음)
+	 * @param rejected 건너뛸 조합(실제 추천은 생일 규칙을 뺀 인기 조합, 시뮬레이션은 없음)
 	 */
 	public static List<DrawnLine> combine(List<DrawnLine> sources, Set<Integer> fixed,
 			Predicate<LottoNumbers> rejected) {

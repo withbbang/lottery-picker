@@ -37,7 +37,7 @@ public class RecommendationEngine {
 		}
 
 		List<DrawnLine> combined = CombinedLines.combine(lines.stream().map(GeneratedLine::line).toList(), c.fixed(),
-				numbers -> PopularityFilter.isPopular(numbers, winners));
+				numbers -> PopularityFilter.isPopularExceptBirthday(numbers, winners));
 
 		List<DrawnLine> controlLines = new ArrayList<>();
 		for (int i = 0; i < CONTROL_LINES; i++) {
