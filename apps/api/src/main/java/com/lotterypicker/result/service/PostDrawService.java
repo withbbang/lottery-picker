@@ -18,9 +18,12 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -145,17 +148,23 @@ public class PostDrawService {
 
 	private static DrawSummary summarize(LottoRound drawn, List<DailyRecommendation> lines,
 			List<RecommendationResult> scored) {
-		Set<Long> recommended = lines.stream()
-			.filter(line -> !line.isControl())
-			.map(DailyRecommendation::getId)
-			.collect(Collectors.toSet());
-		ResultTally tally = ResultTally.of(scored.stream()
-			.filter(result -> recommended.contains(result.getRecommendationId()))
-			.toList());
+		Map<Long, RecommendationResult> byLine = scored.stream()
+			.collect(Collectors.toMap(RecommendationResult::getRecommendationId, Function.identity()));
+		List<DrawSummary.Line> scoredLines = new ArrayList<>();
+		List<RecommendationResult> recommended = new ArrayList<>();
+		for (DailyRecommendation line : lines) {
+			RecommendationResult result = byLine.get(line.getId());
+			if (line.isControl() || result == null) {
+				continue;
+			}
+			recommended.add(result);
+			scoredLines.add(new DrawSummary.Line(line.getDate(), line.numbers(), line.getStrategy(),
+					result.getMatchCount(), result.getPrizeRank()));
+		}
 		LocalDateTime fetchedAt = drawn.getFetchedAt();
 		boolean late = fetchedAt != null && !fetchedAt.isBefore(PollPolicy.overdueAt(drawn.getDrawDate()));
 		return new DrawSummary(drawn.getRoundNo(), drawn.getDrawDate(), drawn.numbers(), drawn.getBonus(),
-				late ? fetchedAt : null, tally);
+				late ? fetchedAt : null, ResultTally.of(recommended), scoredLines);
 	}
 
 }

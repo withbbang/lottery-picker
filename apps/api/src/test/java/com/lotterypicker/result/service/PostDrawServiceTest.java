@@ -194,10 +194,27 @@ class PostDrawServiceTest {
 		serviceOn("2026-11-07T20:45").process(1249);
 
 		// then
-		assertThat(sentText()).contains("1249회 추첨 결과", " 1 ·  2 ·  3 ·  4 ·  5 ·  6 + 7", "추천 35줄 · 최고 4등",
-				"1등 0 · 2등 0 · 3등 0 · 4등 1 · 5등 1 · 낙첨 33", "가상 당첨금 55,000원 (구매했다고 가정)",
-				"가상 수익 +20,000원 (줄당 1,000원, 35,000원 구매 가정)")
-			.doesNotContain("대조군", "1,500,000", "늦게");
+		assertThat(sentText()).contains("1249회 추첨 결과", " 1 ·  2 ·  3 ·  4 ·  5 ·  6 + 7",
+				"1등 0 · 2등 0 · 3등 0 · 4등 1 · 5등 1 · 낙첨 33")
+			.doesNotContain("대조군", "3등 1", "늦게");
+	}
+
+	@Test
+	void 알림은_추천_줄마다_맞힌_개수와_등수를_날짜별로_적는다() {
+		// given
+		rounds.save(round(1249, DRAW_DATE, LocalDateTime.of(2026, 11, 7, 20, 45)));
+		saveWeek(1249, DRAW_DATE);
+
+		// when
+		serviceOn("2026-11-07T20:45").process(1249);
+
+		// then
+		assertThat(sentText()).contains("""
+				<pre>11/01(일)
+				 1 ·  2 ·  3 ·  4 · 30 · 31  4개 4등  최근 빈도
+				 1 ·  2 ·  3 · 30 · 31 · 32  3개 5등  장기 미출현
+				20 · 21 · 22 · 23 · 24 · 25  0개 낙첨  전체 빈도""", "11/07(토)")
+			.doesNotContain(" 1 ·  2 ·  3 ·  4 ·  5 · 40");
 	}
 
 	@Test
@@ -415,6 +432,7 @@ class PostDrawServiceTest {
 			assertThat(s.round()).isEqualTo(1249);
 			assertThat(s.tally().lineCount()).isEqualTo(35);
 			assertThat(s.tally().bestRank()).isEqualTo(PrizeRank.FOURTH);
+			assertThat(s.lines()).hasSize(35);
 		});
 		verify(telegram, never()).send(any(), anyString());
 	}

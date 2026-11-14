@@ -81,7 +81,7 @@ class BotCommandServiceTest {
 	void result는_최근_채점_요약을_답한다() {
 		// given
 		DrawSummary summary = new DrawSummary(1249, LocalDate.of(2026, 11, 7),
-				new LottoNumbers(List.of(1, 2, 3, 4, 5, 6)), 7, null, ResultTally.of(List.of()));
+				new LottoNumbers(List.of(1, 2, 3, 4, 5, 6)), 7, null, ResultTally.of(List.of()), List.of());
 		when(postDraw.latestSummary()).thenReturn(Optional.of(summary));
 
 		// when / then

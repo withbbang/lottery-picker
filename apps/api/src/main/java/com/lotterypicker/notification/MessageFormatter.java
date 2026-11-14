@@ -11,7 +11,9 @@ import com.lotterypicker.result.ResultTally;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 public final class MessageFormatter {
 
 	private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+	private static final DateTimeFormatter MONTH_DAY = DateTimeFormatter.ofPattern("MM/dd");
 
 	private MessageFormatter() {
 	}
@@ -49,7 +52,10 @@ public final class MessageFormatter {
 		return date + " 추천 생성에 실패했습니다. 서버 로그를 확인해 주세요.";
 	}
 
-	/** 대조군을 뺀 추천 줄만 요약한다. 금액은 줄당 1,000원에 샀다고 가정한 가상 값이다. */
+	/**
+	 * 대조군을 뺀 추천 줄을 추천 날짜별로 맞힌 개수·등수와 함께 나열하고 등수별 줄 수를 붙인다.
+	 * 줄은 번호 → 결과 → 전략 순서다. 한글 폭이 기기마다 달라 전략 라벨을 맨 뒤에 둔다.
+	 */
 	public static String drawFinished(DrawSummary summary) {
 		StringBuilder text = new StringBuilder()
 			.append(summary.round()).append("회 추첨 결과 · ").append(dateWithDay(summary.drawDate()));
@@ -66,12 +72,18 @@ public final class MessageFormatter {
 		String counts = Arrays.stream(PrizeRank.values())
 			.map(rank -> rankLabel(rank) + " " + tally.rankCounts().get(rank))
 			.collect(Collectors.joining(" · "));
-		return text.append("추천 ").append(tally.lineCount()).append("줄 · 최고 ").append(rankLabel(tally.bestRank()))
-			.append('\n').append(counts)
-			.append("\n가상 당첨금 ").append(won(tally.prizeTotal())).append(" (구매했다고 가정)")
-			.append("\n가상 수익 ").append(String.format(Locale.KOREA, "%+,d원", tally.profit()))
-			.append(" (줄당 ").append(won(ResultTally.COST_PER_LINE)).append(", ").append(won(tally.cost()))
-			.append(" 구매 가정)\n\n")
+		List<String> rows = new ArrayList<>();
+		LocalDate day = null;
+		for (DrawSummary.Line line : summary.lines()) {
+			if (!line.date().equals(day)) {
+				day = line.date();
+				rows.add(MONTH_DAY.format(day) + "(" + dayOfWeek(day) + ")");
+			}
+			rows.add(numbers(line.numbers()) + "  " + line.matchCount() + "개 " + rankLabel(line.rank()) + "  "
+					+ label(line.strategy()));
+		}
+		return text.append("<pre>").append(String.join("\n", rows)).append("</pre>\n\n")
+			.append(counts).append("\n\n")
 			.append(RecommendationSetResponse.DISCLAIMER)
 			.toString();
 	}
@@ -87,7 +99,11 @@ public final class MessageFormatter {
 	}
 
 	static String dateWithDay(LocalDate date) {
-		return date + "(" + date.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN) + ")";
+		return date + "(" + dayOfWeek(date) + ")";
+	}
+
+	private static String dayOfWeek(LocalDate date) {
+		return date.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN);
 	}
 
 	private static String line(StoredLine line) {

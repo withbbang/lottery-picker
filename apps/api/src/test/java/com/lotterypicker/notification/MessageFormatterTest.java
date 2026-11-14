@@ -104,8 +104,17 @@ class MessageFormatterTest {
 	}
 
 	private static DrawSummary summary(LocalDateTime lateCollectedAt, ResultTally tally) {
+		return summary(lateCollectedAt, tally, List.of());
+	}
+
+	private static DrawSummary summary(LocalDateTime lateCollectedAt, ResultTally tally, List<DrawSummary.Line> lines) {
 		return new DrawSummary(1249, LocalDate.of(2026, 11, 7), new LottoNumbers(List.of(3, 11, 19, 27, 38, 44)), 7,
-				lateCollectedAt, tally);
+				lateCollectedAt, tally, lines);
+	}
+
+	private static DrawSummary.Line scored(LocalDate date, StrategyType strategy, List<Integer> numbers, int matchCount,
+			PrizeRank rank) {
+		return new DrawSummary.Line(date, new LottoNumbers(numbers), strategy, matchCount, rank);
 	}
 
 	private static ResultTally tally() {
@@ -117,9 +126,17 @@ class MessageFormatterTest {
 	}
 
 	@Test
-	void 추첨_종료_알림은_당첨번호와_등수별_줄_수와_가상_금액을_보낸다() {
+	void 추첨_종료_알림은_날짜별로_줄마다_맞힌_개수와_등수와_전략을_적는다() {
+		// given
+		LocalDate sunday = LocalDate.of(2026, 11, 1);
+		LocalDate monday = LocalDate.of(2026, 11, 2);
+		List<DrawSummary.Line> lines = List.of(
+				scored(sunday, StrategyType.RECENT_HOT, List.of(3, 12, 19, 30, 38, 41), 3, PrizeRank.FIFTH),
+				scored(sunday, StrategyType.LONG_COLD, List.of(2, 9, 15, 23, 31, 40), 0, PrizeRank.NONE),
+				scored(monday, StrategyType.COMBINED, List.of(3, 11, 19, 27, 30, 31), 4, PrizeRank.FOURTH));
+
 		// when
-		String text = MessageFormatter.drawFinished(summary(null, tally()));
+		String text = MessageFormatter.drawFinished(summary(null, tally(), lines));
 
 		// then
 		assertThat(text).isEqualTo("""
@@ -127,10 +144,13 @@ class MessageFormatterTest {
 
 				<pre> 3 · 11 · 19 · 27 · 38 · 44 + 7</pre>
 
-				추천 35줄 · 최고 4등
+				<pre>11/01(일)
+				 3 · 12 · 19 · 30 · 38 · 41  3개 5등  최근 빈도
+				 2 ·  9 · 15 · 23 · 31 · 40  0개 낙첨  장기 미출현
+				11/02(월)
+				 3 · 11 · 19 · 27 · 30 · 31  4개 4등  근거 조합</pre>
+
 				1등 0 · 2등 0 · 3등 0 · 4등 1 · 5등 3 · 낙첨 31
-				가상 당첨금 65,000원 (구매했다고 가정)
-				가상 수익 +30,000원 (줄당 1,000원, 35,000원 구매 가정)
 
 				실제 당첨 확률과 무관합니다.""");
 	}
