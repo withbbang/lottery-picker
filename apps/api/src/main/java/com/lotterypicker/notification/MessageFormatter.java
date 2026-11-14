@@ -55,6 +55,7 @@ public final class MessageFormatter {
 	/**
 	 * 대조군을 뺀 추천 줄을 추천 날짜별로 맞힌 개수·등수와 함께 나열하고 등수별 줄 수를 붙인다.
 	 * 줄은 번호 → 결과 → 전략 순서다. 한글 폭이 기기마다 달라 전략 라벨을 맨 뒤에 둔다.
+	 * 날짜 사이는 빈 줄로 띄우고, 근거 조합은 그날 안에서 순서대로 번호를 붙인다(근거 조합1, 2, …).
 	 */
 	public static String drawFinished(DrawSummary summary) {
 		StringBuilder text = new StringBuilder()
@@ -74,13 +75,22 @@ public final class MessageFormatter {
 			.collect(Collectors.joining(" · "));
 		List<String> rows = new ArrayList<>();
 		LocalDate day = null;
+		int combined = 0;
 		for (DrawSummary.Line line : summary.lines()) {
 			if (!line.date().equals(day)) {
+				if (day != null) {
+					rows.add("");
+				}
 				day = line.date();
+				combined = 0;
 				rows.add(MONTH_DAY.format(day) + "(" + dayOfWeek(day) + ")");
 			}
+			String strategy = label(line.strategy());
+			if (line.strategy() == StrategyType.COMBINED) {
+				strategy += ++combined;
+			}
 			rows.add(numbers(line.numbers()) + "  " + line.matchCount() + "개 " + rankLabel(line.rank()) + "  "
-					+ label(line.strategy()));
+					+ strategy);
 		}
 		return text.append("<pre>").append(String.join("\n", rows)).append("</pre>\n\n")
 			.append(counts).append("\n\n")
